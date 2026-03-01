@@ -7,7 +7,7 @@ from .solvers.equilibrium import EquilibriumSolver
 from .utils.visualize import HydrateVisualizer
 
 def main():
-    gas_comp = {"CO2": 0.6, "H2": 0.4}
+    gas_comp = {"CO2": 1.0}
     T_range = np.arange(273.15, 283.15, 1.0)
     
     db = Database()

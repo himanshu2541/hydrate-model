@@ -11,13 +11,13 @@ class EquilibriumSolver:
 
     def _calculate_state(self, T, P, structure):
         """Helper function to calculate and return all thermodynamic properties at a given T, P."""
-        if np.isnan(P):
+        if np.isnan(P) or P <= 0:
             return None
 
-        # 1. Vapor Phase
+        # Vapor Phase
         f_dict, phi_val = self.eos.calc_fugacities(T, P)
 
-        # 2. Liquid Phase
+        # Liquid Phase
         try:
             unifac = ModifiedUnifac({"H2O": 1.0, "CO2": 0.0}, self.database)
             H_val = unifac.calc_henry_constant("CO2", T)
@@ -54,6 +54,8 @@ class EquilibriumSolver:
         """Runs the pressure iteration loop and returns the full thermodynamic state."""
         
         def objective(P):
+            if P <= 0:
+                return 1e6 - P # Return a large positive value to steer away from non-physical pressures
             f_dict, _ = self.eos.calc_fugacities(T, P)
             try:
                 unifac = ModifiedUnifac({"H2O": 1.0, "CO2": 0.0}, self.database)
