@@ -18,7 +18,7 @@ class SRKEOS(EquationOfState):
         bi = np.zeros(n)
 
         for i, gas in enumerate(self.gases):
-            props = self.database.GAS_DB[gas]
+            props = self.database.GUEST_DB[gas]
             Tc, Pc, omega = props["Tc"], props["Pc"], props["omega"]
             Tr = T / Tc
 

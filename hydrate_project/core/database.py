@@ -6,9 +6,8 @@ class Database:
         self.T0 = 273.15  # K - Reference Temperature
         self.P0 = 1.01325e5  # Pa - Reference Pressure
 
-        # Properties of gases (Tc, Pc, omega for PR EOS)
         # Kihara parameters (sigma, epsilon/k, a) for John-Holder model
-        self.GAS_DB = {
+        self.GUEST_DB = {
             "CO2": {
                 "Tc": 304.12,
                 "Pc": 73.74e5,
@@ -25,6 +24,15 @@ class Database:
                 "sigma": 3.11,
                 "eps_k": 27.2,
                 "a": 0.34,
+                "is_linear": False,
+            },
+            "DIOX": {
+                "Tc": 544.0,  # K
+                "Pc": 51.0e5,  # Pa
+                "omega": 0.23,
+                "sigma": 3.48,
+                "eps_k": 380.0,
+                "a": 0.85,
                 "is_linear": False,
             },
         }
@@ -101,7 +109,7 @@ class Database:
                 "del_CP0_ice_b_factor": 0.012,
                 "del_CP0_liq_b_factor": 0.189,
                 "a_w": 0,
-                "sigma_w": 3.56438, # Angstroms
+                "sigma_w": 3.56438,  # Angstroms
                 "eps_k_w": 102.134,  # K
             },
             "sII": {
@@ -115,7 +123,7 @@ class Database:
                 "del_CP0_ice_b_factor": 0.00377,
                 "del_CP0_liq_b_factor": 0.181,
                 "a_w": 0,
-                "sigma_w": 3.56438, # Angstroms
+                "sigma_w": 3.56438,  # Angstroms
                 "eps_k_w": 102.134,  # K
             },
         }
@@ -136,12 +144,15 @@ class Database:
             },  # Standard Larsen values for Water
             22: {"name": "H2", "R": 0.8320, "Q": 1.1410},  # Dahl Table II
             26: {"name": "CO2", "R": 2.5920, "Q": 2.5220},  # Dahl Table II
+            1: {"name": "CH2", "R": 0.6744, "Q": 0.5400},
+            13: {"name": "CH2O", "R": 0.9183, "Q": 0.7800},
         }
 
         self.UNIFAC_MAPPING = {
             "CO2": {"unifac_groups": {26: 1}},
             "H2": {"unifac_groups": {22: 1}},
             "H2O": {"unifac_groups": {6: 1}},
+            "DIOX": {"unifac_groups": {1: 4, 13: 2}},  # Dioxane has 4 CH2 and 2 CH2O groups
         }
 
         # Interaction Parameters a_mn,1 and a_mn,2
@@ -155,6 +166,11 @@ class Database:
             # H2O (6) - H2 (22) interactions
             (6, 22): [949.9, -0.3100],  # From Table III(a) Col 22, Row 6
             (22, 6): [1586.0, 3.924],  # From Table III(b) Row 22, Col 6
+
+            # Assuming zero interactions for groups not listed in Dahl's tables, which is common practice when data is unavailable
+            (6, 1): [0.0, 0.0], (1, 6): [0.0, 0.0],
+            (6, 13): [0.0, 0.0], (13, 6): [0.0, 0.0],
+
             # Gas-Gas interactions (assumed zero as per Dahl paper text)
             (22, 26): [0.0, 0.0],
             (26, 22): [0.0, 0.0],

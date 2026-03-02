@@ -11,7 +11,10 @@ from hydrate_project.utils.visualize import HydrateVisualizer
 from hydrate_project.utils.metrics import calculate_aad
 
 def main():
-    gas_comp = {"CO2": 1.0}  # Pure CO2 system for hydrate formation
+    gas_comp = {"CO2": 1.0}
+    
+    liq_comp = {"H2O": 0.9444, "CO2": 0.0556}
+    
     T_range = np.arange(273.15, 283.15, 0.5) 
     
     db = Database()
@@ -31,7 +34,6 @@ def main():
     pd.set_option('display.width', 1000)
 
     # Define standard Experimental Data for CO2 Hydrate (approx 273K - 282K)
-    # Update these arrays if your specific graph has different extracted points
     experimental_data = {
         "T (K)": [273.15, 275.15, 277.15, 279.15, 281.15, 282.15],
         "P_eq (MPa)": [1.26, 1.67, 2.26, 3.06, 4.18, 4.49] 
@@ -46,12 +48,19 @@ def main():
 
     for eos_name, eos_instance in eos_models.items():
         print(f"\n[{eos_name} EOS] Running Equilibrium Solver...")
-        solver = EquilibriumSolver(database=db, hydrate_model=hydrate_core, eos_model=eos_instance)
+        
+        # Inject the liq_phase_composition here!
+        solver = EquilibriumSolver(
+            liq_phase_composition=liq_comp, 
+            database=db, 
+            hydrate_model=hydrate_core, 
+            eos_model=eos_instance
+        )
         
         results_df = solver.find_optimum_structure(
             T_range=T_range, 
             P_initial_guess=2.5e6, 
-            solver_method="newton" 
+            solver_method="bisect"  # Changed to bisect to avoid crashing on phase boundaries
         )
         
         all_results[eos_name] = results_df

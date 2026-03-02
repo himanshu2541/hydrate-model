@@ -69,7 +69,7 @@ class JohnHolderModel:
 
     def calc_langmuir_constant(self, T, gas, cavity_type, structure):
         db = self.database
-        gas_props = db.GAS_DB[gas]
+        gas_props = db.GUEST_DB[gas]
         struct_props = db.STRUCTURE_DB[structure][cavity_type]
 
         ANGSTROM = 1e-10
