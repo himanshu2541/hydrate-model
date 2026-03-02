@@ -45,9 +45,9 @@ class JohnHolderModel:
         sigma_g = gas_props["sigma"] * 1e-10
         eps_k_g = gas_props["eps_k"]
 
-        a_g = 0.677e-10
-        eps_k_g = 506.25
-        sigma_g = 3.407e-10
+        # a_g = 0.677e-10
+        # eps_k_g = 506.25
+        # sigma_g = 3.407e-10
 
         a_w = ref_props["a_w"] * 1e-10
         sigma_w = ref_props["sigma_w"] * 1e-10
@@ -64,7 +64,7 @@ class JohnHolderModel:
             omega = gas_props["omega"]
             term = (sigma / (Rc - a)) * (eps_k / T0) * abs(omega)
             Q_star = np.exp(-a0 * (term**n0))
-            return Q_star
+            return max(0.5, min(Q_star * 40, 1.0))  # Q* (0.5 to 1.0)
         return 1.0
 
     def calc_langmuir_constant(self, T, gas, cavity_type, structure):
@@ -93,7 +93,7 @@ class JohnHolderModel:
         Rc = struct_props["shells"]["1"]["R"] * ANGSTROM
 
         # Safety limit to avoid singularity
-        limit = Rc - 1e-12
+        limit = Rc - a - 1e-12
 
         def integrand(r):
             w_total = 0.0
@@ -115,14 +115,14 @@ class JohnHolderModel:
             C_star = 0.0
 
         # John-Holder Q* Correction
-        # Q_star = self._q_star_calculation(gas_props, struct_props, db.REFERENCE_PROPS[structure], Rc)
+        Q_star = self._q_star_calculation(gas_props, struct_props, db.REFERENCE_PROPS[structure], Rc)
 
         # print(f"[DEBUG] Langmuir Constant C for {gas} in {cavity_type} cage at T={T:.2f}K: C*={C_star:.4e}, Q*={Q_star:.4e}, C={C_star * Q_star:.4e}")
 
         # print(
         #     f"[DEBUG] Langmuir Constant C for {gas} in {cavity_type} cage at T={T:.2f}K: C*={C_star:.4e} 1/Pa"
         # )
-        return C_star * 1.0
+        return C_star * Q_star
 
     def calc_cage_occupancy(self, T, fugacities, structure, cavity_type):
         C_vals = {}
@@ -208,3 +208,5 @@ class JohnHolderModel:
 
         del_mu_W = self.database.R * T * rhs
         return del_mu_W
+
+

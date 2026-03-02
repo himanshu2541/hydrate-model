@@ -1,18 +1,16 @@
 import numpy as np
 from .base import EquationOfState
 
-class PREOS(EquationOfState):
+class SRKEOS(EquationOfState):
     def __init__(self, composition, database):
         super().__init__(composition, database)
         self.y = np.array([composition[gas] for gas in self.gases])
         self.R = self.database.R
 
     def _binary_interaction_parameter(self, gas1, gas2):
-        # For simplicity, we assume kij = 0 for all pairs
         return 0.0
     
     def _calc_fugacity_coefficients(self, T, P):
-        # Handle low pressure explicitly
         if P < 1.0: return np.ones(len(self.gases))
 
         n = len(self.gases)
@@ -22,13 +20,14 @@ class PREOS(EquationOfState):
         for i, gas in enumerate(self.gases):
             props = self.database.GAS_DB[gas]
             Tc, Pc, omega = props["Tc"], props["Pc"], props["omega"]
-            Tr, Pr = T / Tc, P / Pc
+            Tr = T / Tc
 
-            # Calculate 'a' and 'b' parameters for Peng-Robinson EOS
-            kappa = 0.37464 + 1.54226 * omega - 0.26992 * omega**2
-            alpha = (1 + kappa * (1 - np.sqrt(Tr)))**2
-            ai[i] = 0.45724 * ((self.R * Tc)**2 / Pc) * alpha
-            bi[i] = 0.07780 * (self.R * Tc )/ Pc
+            # SRK specific alpha formulation
+            m = 0.480 + 1.574 * omega - 0.176 * omega**2
+            alpha = (1 + m * (1 - np.sqrt(Tr)))**2
+            
+            ai[i] = 0.42748 * ((self.R * Tc)**2 / Pc) * alpha
+            bi[i] = 0.08664 * (self.R * Tc) / Pc
         
         am = 0.0
         bm = 0.0
@@ -43,8 +42,8 @@ class PREOS(EquationOfState):
         A = am * P / (self.R**2 * T**2)
         B = bm * P / (self.R * T)
 
-        # Z^3 - (1-B)Z^2 + (A - 3B^2 - 2B)Z - (AB - B^2 - B^3) = 0
-        coeffs = [1, -(1 - B), (A - 3*B**2 - 2*B), -(A*B - B**2 - B**3)]
+        # SRK Cubic Equation: Z^3 - Z^2 + (A - B - B^2)Z - AB = 0
+        coeffs = [1, -1, (A - B - B**2), -A * B]
         roots = np.roots(coeffs)
         real_roots = roots[np.isreal(roots)].real
         valid_roots = [z for z in real_roots if z > B]
@@ -52,13 +51,11 @@ class PREOS(EquationOfState):
         if not valid_roots:
             return np.ones(n)
             
-        # Select the root that minimizes Residual Gibbs Free Energy (Stable Phase)
         best_Z = valid_roots[0]
         min_G_res = float('inf')
         
         for Z in valid_roots:
-            term3 = (A / (2 * np.sqrt(2) * B)) * np.log((Z + (1 + np.sqrt(2)) * B) / (Z + (1 - np.sqrt(2)) * B))
-            G_res = Z - 1 - np.log(Z - B) - term3
+            G_res = Z - 1 - np.log(Z - B) - (A / B) * np.log(1 + B / Z)
             
             if G_res < min_G_res:
                 min_G_res = G_res
@@ -69,25 +66,23 @@ class PREOS(EquationOfState):
         ln_phi = np.zeros(n)
         for i in range(n):
             term1 = (bi[i] / bm) * (Z - 1)
-            term2 = np.log(Z - B) if (Z - B) > 0 else -999.0 # Avoid log of non-positive
+            term2 = np.log(Z - B) if (Z - B) > 0 else -999.0 
+            
             sum_ai_aj = 0.0
             for j in range(n):
                 kij = self._binary_interaction_parameter(self.gases[i], self.gases[j])
                 sum_ai_aj += self.y[j] * np.sqrt(ai[i] * ai[j]) * (1 - kij)
+                
             if am > 0 and B > 0:
-                term3 = (A / (2 * np.sqrt(2) * B)) * (2 * sum_ai_aj / am - bi[i] / bm) * np.log((Z + (1 + np.sqrt(2)) * B) / (Z + (1 - np.sqrt(2)) * B))
+                # SRK specific fugacity coefficient term
+                term3 = (A / B) * (2 * sum_ai_aj / am - bi[i] / bm) * np.log(1 + B / Z)
             else:
                 term3 = 0.0
             ln_phi[i] = term1 - term2 - term3
-        
         
         return np.exp(ln_phi)
     
     def calc_fugacities(self, T, P):
         phi = self._calc_fugacity_coefficients(T, P)
-        fugacities = {}
-        for i, gas in enumerate(self.gases):
-            fugacities[gas] = phi[i] * self.y[i] * P
-
-        # print(f"At T={T:.2f}K and P={P/1e6:.4f}MPa: Fugacities: {fugacities}, Fugacity Coefficients: {phi}")
+        fugacities = {gas: phi[i] * self.y[i] * P for i, gas in enumerate(self.gases)}
         return fugacities, phi

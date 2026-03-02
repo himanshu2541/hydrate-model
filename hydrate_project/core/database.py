@@ -141,7 +141,7 @@ class Database:
         self.UNIFAC_MAPPING = {
             "CO2": {"unifac_groups": {26: 1}},
             "H2": {"unifac_groups": {22: 1}},
-            "H20": {"unifac_groups": {6: 1}},
+            "H2O": {"unifac_groups": {6: 1}},
         }
 
         # Interaction Parameters a_mn,1 and a_mn,2
@@ -150,10 +150,10 @@ class Database:
         # Format: (m, n): [a1, a2] -> Interaction of group m with group n
         self.MOD_UNIFAC_INTERACTIONS = {
             # H2O (6) - CO2 (26) interactions
-            (6, 26): [494.0, -0.3050],  # From Table III(a) Col 26, Row 6
-            (26, 6): [-0.0172, -0.4180],  # From Table III(b) Row 26, Col 6
+            (6, 26): [226.6, -0.2410],  # From Table III(a) Col 26, Row 6
+            (26, 6): [1067.0, -0.4180],  # From Table III(b) Row 26, Col 6
             # H2O (6) - H2 (22) interactions
-            (6, 22): [596.3, -0.3100],  # From Table III(a) Col 22, Row 6
+            (6, 22): [949.9, -0.3100],  # From Table III(a) Col 22, Row 6
             (22, 6): [1586.0, 3.924],  # From Table III(b) Row 22, Col 6
             # Gas-Gas interactions (assumed zero as per Dahl paper text)
             (22, 26): [0.0, 0.0],
