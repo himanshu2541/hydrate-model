@@ -12,8 +12,8 @@ class Database:
                 "Tc": 304.12,
                 "Pc": 73.74e5,
                 "omega": 0.225,
-                "sigma": 2.98,
-                "eps_k": 170.1,
+                "sigma":  3.335,
+                "eps_k":  513.85,
                 "a": 0.677,
                 "is_linear": True,
             },
@@ -31,7 +31,7 @@ class Database:
                 "Pc": 51.0e5,  # Pa
                 "omega": 0.23,
                 "sigma": 3.48,
-                "eps_k": 380.0,
+                "eps_k": 2000.0,
                 "a": 0.85,
                 "is_linear": False,
             },
@@ -99,7 +99,7 @@ class Database:
 
         self.REFERENCE_PROPS = {
             "sI": {
-                "dMu0": 1108.0,  # J/mol
+                "dMu0": 1120.0,  # J/mol
                 "dH0_ice": 1714.0,  # J/mol
                 "dH0_liq": -4297,  # J/mol
                 "dV_ice": 3.0e-6,  # m3/mol (approx: ~3 cc/mol)

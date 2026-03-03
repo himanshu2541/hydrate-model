@@ -21,29 +21,78 @@ class EquilibriumSolver:
                     self.promoter_frac = frac
                     break
 
+    def _get_liquid_and_fugacities(self, T, P):
+        """Centralized method to calculate fugacities and liquid water activity."""
+        f_dict, phi_val = self.eos.calc_fugacities(T, P)
+
+        try:
+            unifac_pure = ModifiedUnifac({"H2O": 1.0}, self.database)
+            x_gas_total = 0.0
+            mix_comps = {}
+
+            # 1. Poynting Correction for High Pressure Solubility (Klauda & Sandler 2000, Eq 19)
+            # Apparent molar volume (v_inf) in m^3/mol
+            v_inf = {"CO2": 32.0e-6, "H2": 15.0e-6}
+
+            for gas in list(f_dict.keys()):
+                # Base Henry's constant
+                H_val_base = unifac_pure.calc_henry_constant(gas, T)
+
+                # Apply exponential Poynting penalty
+                poynting_factor = np.exp(
+                    (v_inf.get(gas, 32e-6) * P) / (self.database.R * T)
+                )
+
+                # Corrected solubility
+                x_gas = f_dict[gas] / (H_val_base * poynting_factor)
+                x_gas_total += x_gas
+                mix_comps[gas] = x_gas
+
+            # 2. Add Promoter Penalty to Water Mole Fraction
+            x_w = max(1.0 - x_gas_total - self.promoter_frac, 0.0)
+            mix_comps["H2O"] = x_w
+
+            if self.promoter_frac > 0 and self.promoter_name:
+                mix_comps[self.promoter_name] = self.promoter_frac
+
+            # 3. Calculate Water Activity via UNIFAC
+            unifac_mix = ModifiedUnifac(mix_comps, self.database)
+            gamma_dict = unifac_mix.calc_gamma(T)
+            aw_val = x_w * gamma_dict.get("H2O", 1.0)
+
+            # 4. Promoter Fugacity Calculation (Crucial for Hydrate Cage Entry)
+            if self.promoter_frac > 0 and self.promoter_name:
+                # Clausius-Clapeyron approximation for 1,3-Dioxolane vapor pressure
+                # Boiling point ~348K, P_sat at 293K is ~9.3 kPa
+                delta_H_vap = 35000.0  # J/mol
+                P_sat = 9300.0 * np.exp(
+                    (delta_H_vap / self.database.R) * (1 / 293.15 - 1 / T)
+                )
+
+                # Fugacity = x * gamma * P_sat
+                f_dict[self.promoter_name] = (
+                    self.promoter_frac * gamma_dict.get(self.promoter_name, 1.0) * P_sat
+                )
+
+            return f_dict, phi_val, aw_val, gamma_dict.get("H2O", 1.0)
+
+        except Exception:
+            aw_val = max(
+                1.0
+                - sum(f_dict.get(g, 0) / 7.35e7 for g in f_dict.keys())
+                - self.promoter_frac,
+                0.0,
+            )
+            return f_dict, phi_val, aw_val, 1.0
+
     def _calculate_state(self, T, P, structure):
         """Helper function to calculate and return all thermodynamic properties at a given T, P."""
         if np.isnan(P) or P <= 0:
             return None
 
-        # 1. Vapor Phase
-        f_dict, phi_val = self.eos.calc_fugacities(T, P)
+        f_dict, phi_val, aw_val, gamma_val = self._get_liquid_and_fugacities(T, P)
 
-        # 2. Liquid Phase
-        try:
-            unifac = ModifiedUnifac(self.liq_phase_composition, self.database)
-            H_val = unifac.calc_henry_constant("CO2", T)
-            x_gas = f_dict["CO2"] / H_val
-            x_w = 1.0 - x_gas
-
-            unifac_mix = ModifiedUnifac({"H2O": x_w, "CO2": x_gas}, self.database)
-            gamma_val = unifac_mix.calc_gamma(T)["H2O"]
-            aw_val = x_w * gamma_val
-        except Exception:
-            gamma_val = 1.0
-            aw_val = 1.0 - (f_dict.get("CO2", 0) / 7.35e7)
-
-        # 3. Hydrate Phase & Occupancies
+        # Hydrate Phase & Occupancies
         mu_w = self.hydrate_model.chemical_potential_difference_water(
             T, P, aw_val, structure
         )
@@ -59,7 +108,7 @@ class EquilibriumSolver:
         )
 
         # ---------------------------------------------------------
-        # 4. HYDRATE PHASE COMPOSITION & SEPARATION FACTOR
+        # HYDRATE PHASE COMPOSITION & SEPARATION FACTOR
         # ---------------------------------------------------------
         nu_small = self.database.STRUCTURE_DB[structure]["small"]["nu"]
         nu_large = self.database.STRUCTURE_DB[structure]["large"]["nu"]

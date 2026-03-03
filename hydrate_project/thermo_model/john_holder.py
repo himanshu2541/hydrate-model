@@ -6,6 +6,24 @@ class JohnHolderModel:
         self.database = database
         self.R = self.database.R
 
+    def _get_mixed_kihara_params(self, gas_props, structure):
+        ANGSTROM = 1e-10
+        a_g = gas_props["a"] * ANGSTROM
+        sigma_g = gas_props["sigma"] * ANGSTROM
+        eps_k_g = gas_props["eps_k"]
+
+        a_w = self.database.REFERENCE_PROPS[structure]["a_w"] * ANGSTROM
+        sigma_w = self.database.REFERENCE_PROPS[structure]["sigma_w"] * ANGSTROM
+        eps_k_w = self.database.REFERENCE_PROPS[structure]["eps_k_w"]
+
+        # Mixing rules (Lorentz-Berthelot)
+        a = 0.5 * (a_g + a_w)
+        sigma = 0.5 * (sigma_g + sigma_w)
+        eps_k = np.sqrt(eps_k_g * eps_k_w)
+
+        print(f"[DEBUG] Mixed Kihara Params for {gas_props['name']} in {structure}: a={a:.4e} m, sigma={sigma:.4e} m, eps_k={eps_k:.2f} K")
+        return a, sigma, eps_k
+    
     def _kihara_potential(self, r, sigma, eps, a, R, z):
         """Calculates W(r) in Joules."""
         # Singularity check: if r approaches the wall (R-a), potential explodes
@@ -37,27 +55,12 @@ class JohnHolderModel:
 
         return 2 * z * eps * (term_rep - term_att)
 
-    def _q_star_calculation(self, gas_props, struct_props, ref_props, Rc):
+    def _q_star_calculation(self, gas_props, struct_props, structure, Rc):
         a0 = struct_props.get("a_0", 0)
         n0 = struct_props.get("n_0", 0)
 
-        a_g = gas_props["a"] * 1e-10
-        sigma_g = gas_props["sigma"] * 1e-10
-        eps_k_g = gas_props["eps_k"]
-
-        # a_g = 0.677e-10
-        # eps_k_g = 506.25
-        # sigma_g = 3.407e-10
-
-        a_w = ref_props["a_w"] * 1e-10
-        sigma_w = ref_props["sigma_w"] * 1e-10
-        eps_k_w = ref_props["eps_k_w"]
-
-        # mixing rules
-        a = (a_g + a_w) / 2
-        sigma = (sigma_g + sigma_w) / 2
-        eps_k = np.sqrt(eps_k_g * eps_k_w)
-
+        a, sigma, eps_k = self._get_mixed_kihara_params(gas_props, structure)
+        
         T0 = self.database.T0
 
         if a0 > 0:
@@ -74,19 +77,7 @@ class JohnHolderModel:
 
         ANGSTROM = 1e-10
 
-        sigma_g = gas_props["sigma"] * ANGSTROM
-        a_g = gas_props["a"] * ANGSTROM
-        eps_k_g = gas_props["eps_k"]
-
-        sigma_w = db.REFERENCE_PROPS[structure]["sigma_w"] * ANGSTROM
-        a_w = db.REFERENCE_PROPS[structure]["a_w"] * ANGSTROM
-        eps_w_k = db.REFERENCE_PROPS[structure]["eps_k_w"]
-
-        # Mixed parameters
-        sigma = 0.5 * (sigma_g + sigma_w)
-        a = 0.5 * (a_g + a_w)
-        eps_k = np.sqrt(eps_k_g * eps_w_k)
-
+        a, sigma, eps_k = self._get_mixed_kihara_params(gas_props, structure)
         eps = eps_k * db.KB
 
         # Integration limit
@@ -115,9 +106,9 @@ class JohnHolderModel:
             C_star = 0.0
 
         # John-Holder Q* Correction
-        Q_star = self._q_star_calculation(gas_props, struct_props, db.REFERENCE_PROPS[structure], Rc)
+        Q_star = self._q_star_calculation(gas_props, struct_props, structure, Rc)
 
-        # print(f"[DEBUG] Langmuir Constant C for {gas} in {cavity_type} cage at T={T:.2f}K: C*={C_star:.4e}, Q*={Q_star:.4e}, C={C_star * Q_star:.4e}")
+        print(f"[DEBUG] Langmuir Constant C for {gas} in {cavity_type} cage at T={T:.2f}K: C*={C_star:.4e}, Q*={Q_star:.4e}, C={C_star * Q_star:.4e}")
 
         # print(
         #     f"[DEBUG] Langmuir Constant C for {gas} in {cavity_type} cage at T={T:.2f}K: C*={C_star:.4e} 1/Pa"
