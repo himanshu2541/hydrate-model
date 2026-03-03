@@ -34,7 +34,8 @@ class HydrateVisualizer:
         plt.title('Phase Equilibrium Boundary', fontsize=14)
         plt.xlabel('Temperature (K)', fontsize=12)
         plt.ylabel('Equilibrium Pressure (MPa)', fontsize=12)
-        plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+        plt.grid(False)
+
         
         plt.legend()
         plt.tight_layout()
@@ -53,7 +54,7 @@ class HydrateVisualizer:
         plt.title('Cage Occupancies vs Temperature', fontsize=14)
         plt.xlabel('Temperature (K)', fontsize=12)
         plt.ylabel('Fractional Occupancy (θ)', fontsize=12)
-        plt.grid(True, linestyle='--', linewidth=0.5)
+        plt.grid(False)
         plt.legend()
         plt.tight_layout()
         plt.show()
@@ -73,6 +74,7 @@ class HydrateVisualizer:
             plt.plot(
                 plot_df["T (K)"], 
                 plot_df["P_eq (MPa)"], 
+                marker = ['o', 's', '^', 'D', 'v'][i % 5],
                 color=colors[i % len(colors)], 
                 linestyle=styles[i % len(styles)], 
                 linewidth=2,
@@ -98,7 +100,7 @@ class HydrateVisualizer:
         plt.title('Hydrate Phase Boundary: EOS Comparison', fontsize=16)
         plt.xlabel('Temperature (K)', fontsize=14)
         plt.ylabel('Equilibrium Pressure (MPa)', fontsize=14)
-        plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+        plt.grid(False)
         plt.legend(fontsize=12)
         plt.tight_layout()
         plt.show()

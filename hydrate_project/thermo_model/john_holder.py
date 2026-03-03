@@ -203,7 +203,7 @@ class JohnHolderModel:
             dMu0 / (self.database.R * T0)
             - heat_integral
             + vol_integral
-            - np.log(a_w + 1e-20)
+            - np.log(a_w + 1e-10)
         )
 
         del_mu_W = self.database.R * T * rhs

@@ -13,7 +13,7 @@ class Database:
                 "Pc": 73.74e5,
                 "omega": 0.225,
                 "sigma": 2.98,
-                "eps_k": 190.0,
+                "eps_k": 170.1,
                 "a": 0.677,
                 "is_linear": True,
             },
