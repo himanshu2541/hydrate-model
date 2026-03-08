@@ -12,9 +12,9 @@ class Database:
                 "Tc": 304.12,
                 "Pc": 73.74e5,
                 "omega": 0.225,
-                "sigma":  3.335,
-                "eps_k":  513.85,
-                "a": 0.677,
+                "sigma":  2.9605,
+                "eps_k":  180.6,
+                "a": 0.17730,
                 "is_linear": True,
             },
             "H2": {

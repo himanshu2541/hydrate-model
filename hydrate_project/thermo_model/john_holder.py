@@ -5,24 +5,6 @@ class JohnHolderModel:
     def __init__(self, database):
         self.database = database
         self.R = self.database.R
-
-    def _get_mixed_kihara_params(self, gas_props, structure):
-        ANGSTROM = 1e-10
-        a_g = gas_props["a"] * ANGSTROM
-        sigma_g = gas_props["sigma"] * ANGSTROM
-        eps_k_g = gas_props["eps_k"]
-
-        a_w = self.database.REFERENCE_PROPS[structure]["a_w"] * ANGSTROM
-        sigma_w = self.database.REFERENCE_PROPS[structure]["sigma_w"] * ANGSTROM
-        eps_k_w = self.database.REFERENCE_PROPS[structure]["eps_k_w"]
-
-        # Mixing rules (Lorentz-Berthelot)
-        a = 0.5 * (a_g + a_w)
-        sigma = 0.5 * (sigma_g + sigma_w)
-        eps_k = np.sqrt(eps_k_g * eps_k_w)
-
-        print(f"[DEBUG] Mixed Kihara Params for {gas_props['name']} in {structure}: a={a:.4e} m, sigma={sigma:.4e} m, eps_k={eps_k:.2f} K")
-        return a, sigma, eps_k
     
     def _kihara_potential(self, r, sigma, eps, a, R, z):
         """Calculates W(r) in Joules."""
@@ -59,7 +41,9 @@ class JohnHolderModel:
         a0 = struct_props.get("a_0", 0)
         n0 = struct_props.get("n_0", 0)
 
-        a, sigma, eps_k = self._get_mixed_kihara_params(gas_props, structure)
+        a = gas_props["a"] * 1e-10  # Convert to meters
+        sigma = gas_props["sigma"] * 1e-10  # Convert to meters
+        eps_k = gas_props["eps_k"]
         
         T0 = self.database.T0
 
@@ -67,7 +51,7 @@ class JohnHolderModel:
             omega = gas_props["omega"]
             term = (sigma / (Rc - a)) * (eps_k / T0) * abs(omega)
             Q_star = np.exp(-a0 * (term**n0))
-            return max(0.5, min(Q_star * 40, 1.0))  # Q* (0.5 to 1.0)
+            return max(0.1, min(Q_star * 40, 1.0))  # Q* (0.1 to 1.0)
         return 1.0
 
     def calc_langmuir_constant(self, T, gas, cavity_type, structure):
@@ -77,7 +61,10 @@ class JohnHolderModel:
 
         ANGSTROM = 1e-10
 
-        a, sigma, eps_k = self._get_mixed_kihara_params(gas_props, structure)
+        a = gas_props["a"] * 1e-10  # Convert to meters
+        sigma = gas_props["sigma"] * 1e-10  # Convert to meters
+        eps_k = gas_props["eps_k"]
+
         eps = eps_k * db.KB
 
         # Integration limit
@@ -108,11 +95,6 @@ class JohnHolderModel:
         # John-Holder Q* Correction
         Q_star = self._q_star_calculation(gas_props, struct_props, structure, Rc)
 
-        print(f"[DEBUG] Langmuir Constant C for {gas} in {cavity_type} cage at T={T:.2f}K: C*={C_star:.4e}, Q*={Q_star:.4e}, C={C_star * Q_star:.4e}")
-
-        # print(
-        #     f"[DEBUG] Langmuir Constant C for {gas} in {cavity_type} cage at T={T:.2f}K: C*={C_star:.4e} 1/Pa"
-        # )
         return C_star * Q_star
 
     def calc_cage_occupancy(self, T, fugacities, structure, cavity_type):

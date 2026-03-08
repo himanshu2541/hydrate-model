@@ -11,11 +11,11 @@ from hydrate_project.utils.visualize import HydrateVisualizer
 from hydrate_project.utils.metrics import calculate_aad
 
 def main():
-    # gas_comp = {"CO2": 0.4, "H2": 0.6}
-    gas_comp = {"CO2": 1}
+    gas_comp = {"CO2": 0.4, "H2": 0.6}
+    # gas_comp = {"CO2": 1}
     
-    # liq_comp = {"H2O": 1-0.0556, "DIOX": 0.0556}  # Example liquid phase composition with a small amount of dioxane as an inhibitor
-    liq_comp = {"H2O": 1}
+    liq_comp = {"H2O": 1-0.0556, "DIOX": 0.0556}  # Example liquid phase composition with a small amount of dioxane as an inhibitor
+    # liq_comp = {"H2O": 1}
     T_range = np.arange(273.15, 283.15, 0.5) 
     
     db = Database()
@@ -37,8 +37,8 @@ def main():
     # Define standard Experimental Data for CO2 Hydrate (approx 273K - 282K)
     experimental_data = {
         "T (K)": [273.15, 275.15, 277.15, 279.15, 281.15, 282.15],
-        "P_eq (MPa)": [1.26, 1.67, 2.26, 3.06, 4.18, 4.49] # for pure CO2 hydrate
-        # "P_eq (MPa)": [5.0, 6.5, 8.5, 10.0, 12.0, 15.0]  
+        # "P_eq (MPa)": [1.26, 1.67, 2.26, 3.06, 4.18, 4.49] # for pure CO2 hydrate
+        "P_eq (MPa)": [5.0, 6.5, 8.5, 10.0, 12.0, 15.0]  # for CO2-h2 mix hydrate
     }
 
     # experimental_data = {
