@@ -10,12 +10,64 @@ from hydrate_project.solvers.equilibrium import EquilibriumSolver
 from hydrate_project.utils.visualize import HydrateVisualizer
 from hydrate_project.utils.metrics import calculate_aad
 
+def calculate_thermodynamics(results_df, eos_instance):
+    """
+    Calculates Del_H, Del_S, Del_G based on the Clausius-Clapeyron Equation.
+    """
+    p_col = [col for col in results_df.columns if 'P' in col][0]
+    
+    # --- NEW: Filter out rows where the Equilibrium Solver failed (NaNs) ---
+    valid_mask = results_df[p_col].notna() & results_df['T (K)'].notna()
+    
+    # We need at least 2 valid points to calculate a slope
+    if valid_mask.sum() < 2:
+        results_df['Z_gas'] = np.nan
+        results_df['ΔH_diss (kJ/mol)'] = np.nan
+        results_df['ΔS_diss (J/mol.K)'] = np.nan
+        results_df['ΔG_eq (J/mol)'] = np.nan
+        return results_df
+        
+    valid_df = results_df[valid_mask]
+    
+    T_vals = valid_df['T (K)'].values
+    P_vals_pa = valid_df[p_col].values * 1e6  # Convert MPa back to Pascals
+    
+    inv_T = 1.0 / T_vals
+    ln_P = np.log(P_vals_pa)
+    slopes = np.gradient(ln_P, inv_T)  # d(ln P) / d(1/T)
+    
+    R = 8.31446  # J / (mol*K)
+    Z_list, del_H, del_S, del_G = [], [], [], []
+    
+    for T, P_pa, slope in zip(T_vals, P_vals_pa, slopes):
+        # Fetch Compressibility Z safely
+        if hasattr(eos_instance, 'calc_Z'):
+            Z = eos_instance.calc_Z(T, P_pa)
+        else:
+            Z = 1.0 
+            
+        H = -slope * Z * R  # in J/mol
+        S = H / T  # in J/(mol*K)
+        G = H - (T * S) 
+        
+        Z_list.append(Z)
+        del_H.append(H / 1000.0)
+        del_S.append(S)
+        del_G.append(G)
+        
+    results_df.loc[valid_mask, 'Z_gas'] = Z_list
+    results_df.loc[valid_mask, 'ΔH_diss (kJ/mol)'] = del_H
+    results_df.loc[valid_mask, 'ΔS_diss (J/mol.K)'] = del_S
+    results_df.loc[valid_mask, 'ΔG_eq (J/mol)'] = del_G
+    
+    return results_df
+
 def main():
     gas_comp = {"CO2": 0.4, "H2": 0.6}
     # gas_comp = {"CO2": 1}
     
-    liq_comp = {"H2O": 1-0.0556, "DIOX": 0.0556}  # Example liquid phase composition with a small amount of dioxane as an inhibitor
-    # liq_comp = {"H2O": 1}
+    # liq_comp = {"H2O": 1-0.0556, "DIOX": 0.0556}  # Example liquid phase composition with a small amount of dioxane as an inhibitor
+    liq_comp = {"H2O": 1}
     T_range = np.arange(273.15, 283.15, 0.5) 
     
     db = Database()
@@ -41,11 +93,6 @@ def main():
         "P_eq (MPa)": [5.0, 6.5, 8.5, 10.0, 12.0, 15.0]  # for CO2-h2 mix hydrate
     }
 
-    # experimental_data = {
-    #     "T (K)": [],
-    #     "P_eq (MPa)": []
-    # }
-
     print("="*60)
     print("      HYDRATE EQUILIBRIUM THERMODYNAMIC MODELING")
     print("="*60)
@@ -70,6 +117,9 @@ def main():
             solver_method="bisect"  # Changed to bisect to avoid crashing on phase boundaries
         )
         
+        if not results_df.empty:
+            results_df = calculate_thermodynamics(results_df, eos_instance)
+
         all_results[eos_name] = results_df
         
         # Calculate AAD for this specific model

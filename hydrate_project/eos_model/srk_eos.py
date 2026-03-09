@@ -86,3 +86,55 @@ class SRKEOS(EquationOfState):
         phi = self._calc_fugacity_coefficients(T, P)
         fugacities = {gas: phi[i] * self.y[i] * P for i, gas in enumerate(self.gases)}
         return fugacities, phi
+    
+    def calc_Z(self, T, P) -> float:
+        if np.isnan(P) or np.isnan(T) or np.isinf(P) or np.isinf(T):
+            return 1.0
+        
+        if P < 1.0: return 1.0
+
+        n = len(self.gases)
+        ai, bi = np.zeros(n), np.zeros(n)
+
+        for i, gas in enumerate(self.gases):
+            props = self.database.GUEST_DB[gas]
+            Tc, Pc, omega = props["Tc"], props["Pc"], props["omega"]
+            Tr = T / Tc
+
+            m = 0.480 + 1.574 * omega - 0.176 * omega**2
+            alpha = (1 + m * (1 - np.sqrt(Tr)))**2
+            
+            ai[i] = 0.42748 * ((self.R * Tc)**2 / Pc) * alpha
+            bi[i] = 0.08664 * (self.R * Tc) / Pc
+        
+        am, bm = 0.0, 0.0
+
+        for i in range(n):
+            bm += self.y[i] * bi[i]
+            for j in range(n):
+                kij = self._binary_interaction_parameter(self.gases[i], self.gases[j])
+                a_ij = np.sqrt(ai[i] * ai[j]) * (1 - kij)
+                am += self.y[i] * self.y[j] * a_ij
+        
+        A = am * P / (self.R**2 * T**2)
+        B = bm * P / (self.R * T)
+
+        coeffs = [1, -1, (A - B - B**2), -A * B]
+        roots = np.roots(coeffs)
+        real_roots = roots[np.isreal(roots)].real
+        valid_roots = [z for z in real_roots if z > B]
+        
+        if not valid_roots:
+            return 1.0
+            
+        best_Z = valid_roots[0]
+        min_G_res = float('inf')
+        
+        for Z in valid_roots:
+            G_res = Z - 1 - np.log(Z - B) - (A / B) * np.log(1 + B / Z)
+            
+            if G_res < min_G_res:
+                min_G_res = G_res
+                best_Z = Z
+                
+        return best_Z

@@ -95,3 +95,65 @@ class PTEOS(EquationOfState):
         phi = self._calc_fugacity_coefficients(T, P)
         fugacities = {gas: phi[i] * self.y[i] * P for i, gas in enumerate(self.gases)}
         return fugacities, phi
+    
+    def calc_Z(self, T, P) -> float:
+        if np.isnan(P) or np.isnan(T) or np.isinf(P) or np.isinf(T):
+            return 1.0
+        
+        if P < 1.0: return 1.0
+
+        n = len(self.gases)
+        ai, bi, ci = np.zeros(n), np.zeros(n), np.zeros(n)
+
+        for i, gas in enumerate(self.gases):
+            props = self.database.GUEST_DB[gas]
+            Tc, Pc, omega = props["Tc"], props["Pc"], props["omega"]
+            Tr = T / Tc
+
+            zeta_c = 0.329032 - 0.076799 * omega + 0.0211947 * omega**2
+            Omega_c = 1 - 3 * zeta_c
+            Omega_a = 3 * zeta_c**2 + 3 * (1 - 2 * zeta_c) * Omega_c + Omega_c**2 + 1 - 3 * zeta_c
+            Omega_b = zeta_c
+
+            F = 0.452413 + 1.30982 * omega - 0.295937 * omega**2
+            alpha = (1 + F * (1 - np.sqrt(Tr)))**2
+            
+            ai[i] = Omega_a * ((self.R * Tc)**2 / Pc) * alpha
+            bi[i] = Omega_b * (self.R * Tc) / Pc
+            ci[i] = Omega_c * (self.R * Tc) / Pc
+        
+        am, bm, cm = 0.0, 0.0, 0.0
+
+        for i in range(n):
+            bm += self.y[i] * bi[i]
+            cm += self.y[i] * ci[i]
+            for j in range(n):
+                kij = self._binary_interaction_parameter(self.gases[i], self.gases[j])
+                a_ij = np.sqrt(ai[i] * ai[j]) * (1 - kij)
+                am += self.y[i] * self.y[j] * a_ij
+        
+        A = am * P / (self.R**2 * T**2)
+        B = bm * P / (self.R * T)
+        C = cm * P / (self.R * T)
+
+        coeffs = [1, (C - 1), (A - 2*B*C - B**2 - B - C), (B*C**2 + B**2*C + B**2 + B*C - A*C)]
+        roots = np.roots(coeffs)
+        real_roots = roots[np.isreal(roots)].real
+        if len(real_roots) == 0:
+            return 1.0
+        valid_roots = [z for z in real_roots if z > max(B, C)]
+        
+        if not valid_roots:
+            return 1.0
+            
+        best_Z = valid_roots[0]
+        min_G_res = float('inf')
+        
+        for Z in valid_roots:
+            G_res = Z - 1 - np.log(Z - B) - (A / (B + C)) * np.log((Z + B) / (Z - C))
+            
+            if G_res < min_G_res:
+                min_G_res = G_res
+                best_Z = Z
+
+        return float(best_Z)

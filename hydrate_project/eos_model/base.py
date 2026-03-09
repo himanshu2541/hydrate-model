@@ -15,3 +15,8 @@ class EquationOfState(ABC):
             tuple: (fugacities dict, fugacity coefficients array)
         """
         pass
+
+    @abstractmethod
+    def calc_Z(self, T, P) -> float:
+        """Calculate the compressibility factor Z for the gas mixture."""
+        pass
