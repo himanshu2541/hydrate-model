@@ -102,8 +102,14 @@ class EquilibriumSolver:
         # FIX: look up phi by gas name instead of hardcoding index 0 for CO2
         phi_by_gas = {gas: phi_val[i] for i, gas in enumerate(self.eos.gases)}
 
+        try:
+            Z_val = self.eos.calc_Z(T, P)
+        except Exception:
+            Z_val = float("nan")
+
         state = {
             "P_eq (MPa)": P / 1e6,
+            "Z":          Z_val,
             "a_w": aw_val,
             "gamma_w": gamma_val,
             "Delta_Mu_w": mu_w,

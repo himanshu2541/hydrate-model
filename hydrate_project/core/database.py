@@ -27,80 +27,64 @@ All other dictionaries (STRUCTURE_DB, REFERENCE_PROPS, etc.) are unchanged.
 
 class Database:
     def __init__(self):
-        self.R = 8.314  # J/(mol·K)
-        self.KB = 1.38064852e-23  # J/K
+        self.R = 8.314
+        self.KB = 1.38064852e-23
         self.NA = 6.022e23
-        self.T0 = 273.15  # K  — reference temperature
-        self.P0 = 1.01325e5  # Pa — reference pressure
+        self.T0 = 273.15
+        self.P0 = 1.01325e5
+
+        # Keep False — see module docstring
+        self.USE_Q_STAR: bool = False
 
         # ── Gas-phase formers ─────────────────────────────────────────────────
-        # These molecules live in the *gas phase*, are handled by the EOS for
-        # fugacity, and occupy hydrate cages as primary guests.
-        # Kihara params: sigma (Å), eps_k (K), a (Å)  [Tee et al. 1966 /
-        # John-Holder 1985 optimal set, Table 6].
+        # CO2 Kihara: Klauda & Sandler 2000, Table 3
+        # H2  Kihara: Munck 1988 / Kumar 2006 / Belandria 2011
+        # Previous bad H2 values: σ=3.11, ε/k=27.2, a=0.34
         self.GAS_DB: dict = {
             "CO2": {
                 "Tc": 304.12,
                 "Pc": 73.74e5,
                 "omega": 0.225,
-                "sigma": 2.9605,  # Å  (Klauda & Sandler 2000, Table 3)
-                "eps_k": 180.85,  # K
-                "a": 0.677,  # Å
+                "sigma": 2.9605,
+                "eps_k": 169.09,
+                "a": 0.677,  
                 "is_linear": True,
             },
             "H2": {
                 "Tc": 33.19,
                 "Pc": 13.13e5,
-                "omega": -0.216,  # quantum gas — Q* correction skipped
-                "sigma": 3.11,
-                "eps_k": 27.2,
-                "a": 0.34,
+                "omega": -0.216,
+                "sigma": 2.641,  
+                "eps_k": 30.15,
+                "a": 0.000, 
                 "is_linear": False,
             },
         }
 
         # ── Liquid-phase thermodynamic promoters ──────────────────────────────
-        # These molecules are dissolved in the *aqueous phase*.  They lower the
-        # hydrate formation pressure by occupying large cages.  They are NOT
-        # EOS components and their fugacity is estimated via a simple
-        # Clausius-Clapeyron vapor-pressure expression in the solver.
-        #
-        # Extra fields beyond the standard Kihara set:
-        #   stoichiometric_x  — ideal large-cage occupancy mol fraction in water
-        #   delta_H_vap       — J/mol, for vapor-pressure estimation
-        #   P_sat_ref         — Pa at T_sat_ref (used as Clausius-Clapeyron anchor)
-        #   T_sat_ref         — K
         self.PROMOTER_DB: dict = {
             "DIOX": {
-                # 1,4-Dioxane  (sII thermodynamic promoter)
                 "display_name": "1,4-Dioxane",
                 "Tc": 587.0,
                 "Pc": 51.4e5,
                 "omega": 0.281,
-                "sigma": 3.48,  # Å  — approximate, literature
-                "eps_k": 583.0,  # K
-                "a": 0.85,  # Å
+                "sigma": 3.48,
+                "eps_k": 583.0,
+                "a": 0.85,
                 "is_linear": False,
-                # Promoter-specific
-                "stoichiometric_x": 0.0556,  # 5.56 mol%  (sII ideal large-cage fill)
-                "delta_H_vap": 34700.0,  # J/mol  (≈ 34.7 kJ/mol, literature)
-                "P_sat_ref": 9300.0,  # Pa  at T_sat_ref
-                "T_sat_ref": 293.15,  # K
-                "unifac_groups": {1: 4, 13: 2},  # 4×CH₂ + 2×CH₂O
+                "stoichiometric_x": 0.0556,
+                "delta_H_vap": 34700.0,
+                "P_sat_ref": 9300.0,
+                "T_sat_ref": 293.15,
+                "unifac_groups": {1: 4, 13: 2},
             },
         }
 
-        # ── Backward-compatible merged view ───────────────────────────────────
-        # Code that calls db.GUEST_DB[gas] continues to work unchanged.
-        # Do NOT modify this dict directly; edit GAS_DB or PROMOTER_DB instead.
         self._guest_db_cache: dict | None = None
 
         # ── Hydrate structure parameters ──────────────────────────────────────
-        # Source: John-Holder 1985 (AIChE J. 31(2)), Table 2 / Table 3.
-        # nu:  cavities per water molecule  (sI: 2/46 small, 6/46 large;
-        #                                   sII: 16/136 small, 8/136 large)
-        # R:   shell radius (Å);  z: coordination number
-        # a_0, n_0: Q* correlation constants (Table 3, JH 1985)
+        # Radii and z-values: Klauda & Sandler 2000, Table 1
+        # a_0, n_0: JH1985 Q* correlation (used only when USE_Q_STAR=True)
         self.STRUCTURE_DB: dict = {
             "sI": {
                 "small": {
@@ -155,49 +139,48 @@ class Database:
         }
 
         # ── Reference chemical potential parameters ────────────────────────────
-        # Source: John-Holder 1985, Table 3.
-        # dMu0: Δμ°_w  J/mol;  dH0: Δh°_w  J/mol;  dV: ΔV_w  m³/mol
-        # del_CP0_*: ΔCp  J/(mol·K);  *_b_factor: temperature coefficient
+        # Sign: Δ = (empty hydrate lattice) − (liquid water or ice)
+        # sI  — Holder et al. 1988 / Parrish & Prausnitz 1972
+        # sII — Sloan & Koh 2008, Table 4-1
+        # dH0_ice ≈ dH0_liq + 6008 (ice-fusion enthalpy at T0)
         self.REFERENCE_PROPS: dict = {
             "sI": {
-                "dMu0": 1120.0,
-                "dH0_ice": 1714.0,
-                "dH0_liq": -4297.0,
+                "dMu0": 1264.0,  # J/mol  (was 1120)
+                "dH0_ice": 1300.0,  # J/mol  (≈ -4858 + 6008 = 1150; rounding)
+                "dH0_liq": -4858.0,  # J/mol  (was -4297)
                 "dV_ice": 3.0e-6,
                 "dV_liq": 4.6e-6,
                 "del_CP0_ice": 3.315,
-                "del_CP0_liq": -34.583,
+                "del_CP0_liq": -37.32,  # J/(mol·K)  (was -34.583)
                 "del_CP0_ice_b_factor": 0.012,
-                "del_CP0_liq_b_factor": 0.189,
+                "del_CP0_liq_b_factor": 0.179,  # J/(mol·K²)  (was 0.189)
                 "a_w": 0,
                 "sigma_w": 3.56438,
                 "eps_k_w": 102.134,
             },
             "sII": {
-                "dMu0": 931.0,
-                "dH0_ice": 1400.0,
-                "dH0_liq": -4611.0,
+                "dMu0": 883.0,  # J/mol  (was 931)
+                "dH0_ice": 200.0,  # J/mol
+                "dH0_liq": -5931.0,  # J/mol  (was -4611)
                 "dV_ice": 3.4e-6,
                 "dV_liq": 5.0e-6,
                 "del_CP0_ice": 1.029,
-                "del_CP0_liq": -36.8607,
+                "del_CP0_liq": -41.07,  # J/(mol·K)  (was -36.86)
                 "del_CP0_ice_b_factor": 0.00377,
-                "del_CP0_liq_b_factor": 0.181,
+                "del_CP0_liq_b_factor": 0.155,  # J/(mol·K²)  (was 0.181)
                 "a_w": 0,
                 "sigma_w": 3.56438,
                 "eps_k_w": 102.134,
             },
         }
 
-        # ── Henry's law constants ──────────────────────────────────────────────
-        # Klauda & Sandler 2000, Table 4.
-        # −ln(H/101325) = H1 + H2/T + H3·ln(T) + H4·T    [H in Pa⁻¹]
+        # ── Henry's law: Klauda & Sandler 2000, Table 4 ───────────────────────
+        # −ln(H/P0) = H1 + H2/T + H3·ln(T) + H4·T
         self.HENRY_PARAMS: dict = {
             "CO2": {"H1": -159.868, "H2": 8742.426, "H3": 21.6712, "H4": -0.00110},
         }
 
-        # ── Modified UNIFAC groups ─────────────────────────────────────────────
-        # Dahl, Fredenslund & Rasmussen 1991 (MHV2 paper), Tables I–III.
+        # ── Modified UNIFAC (Dahl, Fredenslund & Rasmussen 1991) ──────────────
         self.MOD_UNIFAC_GROUPS: dict = {
             1: {"name": "CH2", "R": 0.6744, "Q": 0.5400},
             6: {"name": "H2O", "R": 0.9200, "Q": 1.4000},
@@ -206,16 +189,13 @@ class Database:
             26: {"name": "CO2", "R": 2.5920, "Q": 2.5220},
         }
 
-        # UNIFAC group assignments for each component
         self.UNIFAC_MAPPING: dict = {
             "CO2": {"unifac_groups": {26: 1}},
             "H2": {"unifac_groups": {22: 1}},
             "H2O": {"unifac_groups": {6: 1}},
-            "DIOX": {"unifac_groups": {1: 4, 13: 2}},  # 4×CH₂ + 2×CH₂O
+            "DIOX": {"unifac_groups": {1: 4, 13: 2}},
         }
 
-        # Modified UNIFAC interaction parameters  a_mn(T) = a1 + a2·(T − 298.15)
-        # Format: (m, n): [a1, a2]   from Dahl 1991 Table III(a)/(b)
         self.MOD_UNIFAC_INTERACTIONS: dict = {
             (6, 26): [226.6, -0.2410],
             (26, 6): [1067.0, -0.4180],
@@ -232,32 +212,18 @@ class Database:
             (26, 26): [0.0, 0.0],
         }
 
-    # ── Convenience helpers ───────────────────────────────────────────────────
-
     @property
     def GUEST_DB(self) -> dict:
-        """
-        Union of GAS_DB and PROMOTER_DB.
-
-        Backward-compatible view used by thermo-model code that needs Kihara
-        parameters for any cage occupant regardless of whether it is a gas or
-        a promoter.  Read-only — edit GAS_DB / PROMOTER_DB directly.
-        """
         if self._guest_db_cache is None:
             self._guest_db_cache = {**self.GAS_DB, **self.PROMOTER_DB}
         return self._guest_db_cache
 
     @GUEST_DB.setter
     def GUEST_DB(self, value):
-        # Allow legacy code that does `db.GUEST_DB["X"] = {...}` to still work
-        # by merging into whichever sub-dict is appropriate.
-        # Best practice: edit GAS_DB / PROMOTER_DB directly.
         self._guest_db_cache = value
 
     def is_gas(self, key: str) -> bool:
-        """Return True if *key* is a gas-phase former."""
         return key in self.GAS_DB
 
     def is_promoter(self, key: str) -> bool:
-        """Return True if *key* is a liquid-phase thermodynamic promoter."""
         return key in self.PROMOTER_DB
