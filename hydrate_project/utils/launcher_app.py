@@ -3,13 +3,16 @@ launcher_app.py
 ---------------
 Pre-computation configuration GUI for the Hydrate Equilibrium Model.
 
-Allows the user to:
-  • Set gas phase composition  (mole fractions sum to 1)
-  • Choose temperature scan range  (T_min, T_max, T_step)
-  • Select which EOS models to run
-  • Optionally supply experimental data (presets or manual entry)
-  • Run the solver with a live progress bar
-  • Launch the General Plot Builder when done
+Features
+--------
+  • Gas phase composition  (dynamic rows, live sum validator)
+  • Liquid phase composition  (H₂O baseline + optional promoter)
+  • Temperature scan range   (T_min / T_max / T_step with point count preview)
+  • EOS model selection      (PR, SRK, PT)
+  • SQLite LIFO result cache (automatic hit/miss with clear-cache button)
+  • Experimental data        (none / literature presets / manual entry)
+  • Progress bar + background worker thread
+  • Opens Plot Builder on completion
 """
 
 from __future__ import annotations
@@ -23,12 +26,11 @@ import numpy as np
 import pandas as pd
 
 from hydrate_project.utils.general_plotter import theme as th
+from hydrate_project.utils.cache import get_cache
 from hydrate_project.utils.general_plotter.app import PlotBuilderWindow
 
 
-# ── Preset experimental data from literature ─────────────────────────────────
-# Data extracted from figures / tables in the uploaded papers.
-# These are approximate values; users can always enter custom data.
+# ── Literature presets ────────────────────────────────────────────────────────
 
 PRESET_DATA: dict[str, dict] = {
     "CO₂/H₂ (39.2/60.8 mol%) — Kumar et al. 2006  [sI, bulk water]": {
@@ -45,12 +47,38 @@ PRESET_DATA: dict[str, dict] = {
     },
 }
 
-# Available gases (must match keys in core/database.py GUEST_DB)
-AVAILABLE_GASES = ["CO2", "H2", "DIOX"]
-GAS_LABELS = {"CO2": "CO₂", "H2": "H₂", "DIOX": "1,4-Dioxane"}
+# ── Available components (sourced from the database at import time) ───────────
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+def _load_component_lists():
+    """Pull gas and promoter lists from Database so there's one source of truth."""
+    try:
+        from hydrate_project.core.database import Database
+
+        db = Database()
+        gases = list(db.GAS_DB.keys())
+        promoters = {}
+        for k, v in db.PROMOTER_DB.items():
+            promoters[k] = (
+                v.get("display_name", k),
+                v.get("stoichiometric_x", 0.05),
+                f"Stoichiometric: {v.get('stoichiometric_x', 0.05)*100:.2f} mol%",
+            )
+        return gases, promoters
+    except Exception:
+        # Fallback in case DB can't be imported yet
+        return (
+            ["CO2", "H2"],
+            {"DIOX": ("1,4-Dioxane", 0.0556, "Stoichiometric: 5.56 mol%")},
+        )
+
+
+AVAILABLE_GASES, PROMOTERS = _load_component_lists()
+GAS_LABELS = {k: k for k in AVAILABLE_GASES}  # plain fallback; override if needed
+GAS_LABELS.update({"CO2": "CO₂", "H2": "H₂"})
+
+
+# ── Solver worker ─────────────────────────────────────────────────────────────
 
 
 def _run_model(
@@ -60,7 +88,7 @@ def _run_model(
     eos_names: list[str],
     status_cb: callable,
 ) -> tuple[dict, Optional[Exception]]:
-    """Run the solver for every selected EOS.  Returns (results_dict, error)."""
+    """Run solver for every selected EOS.  Returns (results_dict, error)."""
     try:
         from hydrate_project.core.database import Database
         from hydrate_project.thermo_model.john_holder import JohnHolderModel
@@ -101,7 +129,7 @@ def _run_model(
         return {}, exc
 
 
-# ── Launcher application ──────────────────────────────────────────────────────
+# ── Launcher GUI ──────────────────────────────────────────────────────────────
 
 
 class LauncherApp(tk.Tk):
@@ -110,53 +138,59 @@ class LauncherApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Hydrate Equilibrium Model")
-        self.geometry("860x780")
+        self.geometry("880x900")
         self.resizable(True, True)
         th.apply(self)
 
-        self._gas_rows: list[dict] = []  # list of {gas_var, frac_var, frame}
+        self._gas_rows: list[dict] = []
         self._exp_mode = tk.StringVar(value="none")
         self._preset_var = tk.StringVar(value=next(iter(PRESET_DATA)))
         self._results: Optional[dict] = None
         self._exp_data: Optional[dict] = None
 
+        # Promoter state
+        self._promoter_var = tk.StringVar(value="none")  # "none" or key in PROMOTERS
+        self._promoter_frac = tk.StringVar(value="0.0556")
+
         self._build_ui()
 
-        # Seed two default gas rows
+        # Default gas rows
         self._add_gas_row("CO2", 0.40)
         self._add_gas_row("H2", 0.60)
+        self._refresh_liquid_display()
 
-    # ── UI construction ───────────────────────────────────────────────────────
+    # ── UI skeleton ───────────────────────────────────────────────────────────
 
     def _build_ui(self):
         outer = ttk.Frame(self, style="TFrame", padding=16)
         outer.pack(fill=tk.BOTH, expand=True)
 
-        # Scrollable canvas so the window adapts to small screens
-        canvas = tk.Canvas(outer, bg=th.BASE, highlightthickness=0)
-        vsb = th.styled_scrollbar(outer, orient=tk.VERTICAL, command=canvas.yview)
-        canvas.configure(yscrollcommand=vsb.set)
+        scroll_canvas = tk.Canvas(outer, bg=th.BASE, highlightthickness=0)
+        vsb = th.styled_scrollbar(
+            outer, orient=tk.VERTICAL, command=scroll_canvas.yview
+        )
+        scroll_canvas.configure(yscrollcommand=vsb.set)
         vsb.pack(side=tk.RIGHT, fill=tk.Y)
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scroll_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self._inner = ttk.Frame(canvas, style="TFrame", padding=(0, 4))
-        inner_id = canvas.create_window((0, 0), window=self._inner, anchor="nw")
+        self._inner = ttk.Frame(scroll_canvas, style="TFrame", padding=(0, 4))
+        win_id = scroll_canvas.create_window((0, 0), window=self._inner, anchor="nw")
 
-        def _resize(e):
-            canvas.configure(scrollregion=canvas.bbox("all"))
-
-        def _canvas_resize(e):
-            canvas.itemconfig(inner_id, width=e.width)
-
-        self._inner.bind("<Configure>", _resize)
-        canvas.bind("<Configure>", _canvas_resize)
-        canvas.bind_all(
-            "<MouseWheel>", lambda e: canvas.yview_scroll(int(-e.delta / 120), "units")
+        self._inner.bind(
+            "<Configure>",
+            lambda e: scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all")),
+        )
+        scroll_canvas.bind(
+            "<Configure>", lambda e: scroll_canvas.itemconfig(win_id, width=e.width)
+        )
+        scroll_canvas.bind_all(
+            "<MouseWheel>",
+            lambda e: scroll_canvas.yview_scroll(int(-e.delta / 120), "units"),
         )
 
         P = {"pady": (0, 14), "fill": tk.X}
 
-        # ── Header ────────────────────────────────────────────────────────────
+        # Header
         hdr = ttk.Frame(self._inner, style="TFrame")
         hdr.pack(**P)
         ttk.Label(hdr, text="🔬  Hydrate Equilibrium Model", style="Title.TLabel").pack(
@@ -169,23 +203,84 @@ class LauncherApp(tk.Tk):
         ).pack(anchor=tk.W, pady=(2, 0))
         ttk.Separator(self._inner, orient="horizontal").pack(fill=tk.X, pady=(0, 10))
 
-        # ── Gas composition ───────────────────────────────────────────────────
-        self._gas_frame_outer = self._section("Gas Phase Composition")
-        self._gas_frame_outer.pack(**P)
-        self._gas_rows_frame = ttk.Frame(self._gas_frame_outer, style="TFrame")
+        # ── Section: Gas phase ────────────────────────────────────────────────
+        gas_sec = self._section("Gas Phase Composition")
+        gas_sec.pack(**P)
+        self._gas_rows_frame = ttk.Frame(gas_sec, style="TFrame")
         self._gas_rows_frame.pack(fill=tk.X)
-        add_btn_row = ttk.Frame(self._gas_frame_outer, style="TFrame")
-        add_btn_row.pack(fill=tk.X, pady=(6, 0))
+        add_row = ttk.Frame(gas_sec, style="TFrame")
+        add_row.pack(fill=tk.X, pady=(6, 0))
         ttk.Button(
-            add_btn_row,
+            add_row,
             text="＋  Add gas",
             style="TButton",
             command=self._add_gas_row_dialog,
         ).pack(side=tk.LEFT)
-        self._sum_label = ttk.Label(add_btn_row, text="Sum: —", style="Muted.TLabel")
+        self._sum_label = ttk.Label(add_row, text="Sum: —", style="Muted.TLabel")
         self._sum_label.pack(side=tk.RIGHT, padx=4)
 
-        # ── Temperature range ─────────────────────────────────────────────────
+        # ── Section: Liquid phase / Promoter ─────────────────────────────────
+        liq_sec = self._section("Liquid Phase Composition")
+        liq_sec.pack(**P)
+
+        # Static display row
+        disp_row = ttk.Frame(liq_sec, style="TFrame")
+        disp_row.pack(fill=tk.X)
+        self._liq_display = ttk.Label(
+            disp_row,
+            text="H₂O: 1.0000",
+            style="Section.TLabel",
+            font=("Segoe UI", 10, "bold"),
+        )
+        self._liq_display.pack(side=tk.LEFT)
+
+        # Promoter toggle row
+        prom_toggle = ttk.Frame(liq_sec, style="TFrame")
+        prom_toggle.pack(fill=tk.X, pady=(8, 0))
+        ttk.Label(prom_toggle, text="Promoter:", style="Muted.TLabel", width=10).pack(
+            side=tk.LEFT
+        )
+
+        prom_opts = ["None"] + [f"{v[0]}  ({k})" for k, v in PROMOTERS.items()]
+        self._prom_display_map = {"None": "none"}
+        for k, v in PROMOTERS.items():
+            self._prom_display_map[f"{v[0]}  ({k})"] = k
+
+        self._prom_cb_var = tk.StringVar(value="None")
+        prom_cb = ttk.Combobox(
+            prom_toggle,
+            textvariable=self._prom_cb_var,
+            values=prom_opts,
+            state="readonly",
+            width=24,
+            font=("Segoe UI", 9),
+        )
+        prom_cb.pack(side=tk.LEFT, padx=(0, 12))
+        prom_cb.bind("<<ComboboxSelected>>", self._on_promoter_change)
+
+        # Concentration entry (shown only when promoter != None)
+        self._prom_frac_frame = ttk.Frame(liq_sec, style="TFrame")
+        self._prom_frac_frame.pack(fill=tk.X, pady=(6, 0))
+        ttk.Label(
+            self._prom_frac_frame, text="Mol fraction:", style="Muted.TLabel"
+        ).pack(side=tk.LEFT)
+        prom_ent = ttk.Entry(
+            self._prom_frac_frame,
+            textvariable=self._promoter_frac,
+            width=10,
+            font=("Segoe UI", 10),
+        )
+        prom_ent.pack(side=tk.LEFT, padx=(6, 10))
+        self._prom_hint = ttk.Label(
+            self._prom_frac_frame, text="", style="Muted.TLabel"
+        )
+        self._prom_hint.pack(side=tk.LEFT)
+        self._prom_frac_frame.pack_forget()  # hidden until promoter selected
+        self._promoter_frac.trace_add(
+            "write", lambda *_: self._refresh_liquid_display()
+        )
+
+        # ── Section: Temperature ──────────────────────────────────────────────
         T_sec = self._section("Temperature Scan Range")
         T_sec.pack(**P)
         T_row = ttk.Frame(T_sec, style="TFrame")
@@ -206,7 +301,7 @@ class LauncherApp(tk.Tk):
         self._t_preview.pack(anchor=tk.W, pady=(4, 0))
         self._update_t_preview()
 
-        # ── EOS selection ─────────────────────────────────────────────────────
+        # ── Section: EOS ──────────────────────────────────────────────────────
         eos_sec = self._section("Equation of State Models")
         eos_sec.pack(**P)
         eos_row = ttk.Frame(eos_sec, style="TFrame")
@@ -219,8 +314,25 @@ class LauncherApp(tk.Tk):
                 side=tk.LEFT, padx=(0, 16)
             )
 
-        # ── Experimental data ─────────────────────────────────────────────────
-        exp_sec = self._section("Experimental Data  (optional — for AAD calculation)")
+        # ── Section: Cache info ───────────────────────────────────────────────
+        cache_sec = self._section("Result Cache  (SQLite · LIFO eviction)")
+        cache_sec.pack(**P)
+        cache_top = ttk.Frame(cache_sec, style="TFrame")
+        cache_top.pack(fill=tk.X)
+        self._cache_label = ttk.Label(
+            cache_top, text="Checking cache…", style="Muted.TLabel"
+        )
+        self._cache_label.pack(side=tk.LEFT)
+        ttk.Button(
+            cache_top,
+            text="🗑  Clear cache",
+            style="TButton",
+            command=self._on_clear_cache,
+        ).pack(side=tk.RIGHT)
+        self._update_cache_label()
+
+        # ── Section: Experimental data ────────────────────────────────────────
+        exp_sec = self._section("Experimental Data  (optional — for AAD)")
         exp_sec.pack(**P)
         mode_row = ttk.Frame(exp_sec, style="TFrame")
         mode_row.pack(fill=tk.X)
@@ -243,22 +355,21 @@ class LauncherApp(tk.Tk):
         ttk.Label(self._preset_frame, text="Dataset:", style="Muted.TLabel").pack(
             side=tk.LEFT, padx=(0, 8)
         )
-        preset_cb = ttk.Combobox(
+        ttk.Combobox(
             self._preset_frame,
             textvariable=self._preset_var,
             values=list(PRESET_DATA.keys()),
             state="readonly",
             font=("Segoe UI", 9),
             width=62,
-        )
-        preset_cb.pack(side=tk.LEFT)
-        self._preset_frame.pack_forget()  # hidden initially
+        ).pack(side=tk.LEFT)
+        self._preset_frame.pack_forget()
 
         self._custom_frame = ttk.Frame(exp_sec, style="TFrame")
         self._custom_frame.pack(fill=tk.X, pady=(6, 0))
         ttk.Label(
             self._custom_frame,
-            text="Enter one T(K), P(MPa) pair per line  " "(comma or space separated):",
+            text="One  T(K), P(MPa)  pair per line (comma or space separated):",
             style="Muted.TLabel",
         ).pack(anchor=tk.W)
         self._custom_text = scrolledtext.ScrolledText(
@@ -276,39 +387,38 @@ class LauncherApp(tk.Tk):
         )
         self._custom_text.pack(fill=tk.X)
         self._custom_text.insert("end", "# T(K)   P(MPa)\n273.9   5.56\n275.7   6.90\n")
-        self._custom_frame.pack_forget()  # hidden initially
+        self._custom_frame.pack_forget()
 
-        # ── Actions ───────────────────────────────────────────────────────────
-        act_sec = ttk.Frame(self._inner, style="TFrame")
-        act_sec.pack(fill=tk.X, pady=(4, 0))
+        # ── Run button + status ───────────────────────────────────────────────
         ttk.Separator(self._inner, orient="horizontal").pack(fill=tk.X, pady=(0, 10))
-
         self._run_btn = ttk.Button(
-            act_sec,
+            self._inner,
             text="▶   Run Calculation",
             style="Primary.TButton",
             command=self._on_run,
         )
         self._run_btn.pack(fill=tk.X, pady=(0, 8))
 
-        self._progress = ttk.Progressbar(act_sec, mode="indeterminate", length=300)
+        self._progress = ttk.Progressbar(self._inner, mode="indeterminate")
         self._progress.pack(fill=tk.X, pady=(0, 6))
         self._progress.pack_forget()
 
         self._status_var = tk.StringVar(value="Ready.")
         ttk.Label(
-            act_sec, textvariable=self._status_var, style="Muted.TLabel", wraplength=780
+            self._inner,
+            textvariable=self._status_var,
+            style="Muted.TLabel",
+            wraplength=820,
         ).pack(anchor=tk.W)
 
-    # ── Gas composition rows ──────────────────────────────────────────────────
+    # ── Helper ────────────────────────────────────────────────────────────────
 
     def _section(self, title: str) -> ttk.LabelFrame:
         return ttk.LabelFrame(
-            self._inner,
-            text=f"  {title}  ",
-            style="TLabelframe",
-            padding=(10, 8),
+            self._inner, text=f"  {title}  ", style="TLabelframe", padding=(10, 8)
         )
+
+    # ── Gas composition ───────────────────────────────────────────────────────
 
     def _add_gas_row(self, gas: str = "CO2", frac: float = 0.5):
         row = ttk.Frame(self._gas_rows_frame, style="TFrame")
@@ -318,32 +428,28 @@ class LauncherApp(tk.Tk):
         frac_var = tk.StringVar(value=str(round(frac, 4)))
 
         ttk.Label(row, text="Gas:", style="Muted.TLabel", width=4).pack(side=tk.LEFT)
-        cb = ttk.Combobox(
+        ttk.Combobox(
             row,
             textvariable=gas_var,
             values=AVAILABLE_GASES,
             state="readonly",
             width=10,
             font=("Segoe UI", 9),
-        )
-        cb.pack(side=tk.LEFT, padx=(0, 12))
-
+        ).pack(side=tk.LEFT, padx=(0, 12))
         ttk.Label(row, text="Mole fraction:", style="Muted.TLabel").pack(side=tk.LEFT)
-        ent = ttk.Entry(row, textvariable=frac_var, width=10, font=("Segoe UI", 10))
-        ent.pack(side=tk.LEFT, padx=(4, 12))
+        ttk.Entry(row, textvariable=frac_var, width=10, font=("Segoe UI", 10)).pack(
+            side=tk.LEFT, padx=(4, 12)
+        )
 
+        entry = {"gas_var": gas_var, "frac_var": frac_var, "frame": row}
         del_btn = ttk.Button(
             row,
             text="✕",
             style="TButton",
             width=3,
-            command=lambda r=row, d=None: self._delete_gas_row(r),
+            command=lambda e=entry: self._delete_gas_row(e),
         )
         del_btn.pack(side=tk.LEFT)
-
-        entry = {"gas_var": gas_var, "frac_var": frac_var, "frame": row}
-        # store reference in del_btn closure
-        del_btn.configure(command=lambda e=entry: self._delete_gas_row(e))
 
         self._gas_rows.append(entry)
         frac_var.trace_add("write", lambda *_: self._update_sum())
@@ -383,7 +489,39 @@ class LauncherApp(tk.Tk):
             foreground=th.GREEN if ok else th.RED,
         )
 
-    # ── Temperature preview ───────────────────────────────────────────────────
+    # ── Promoter / liquid phase ───────────────────────────────────────────────
+
+    def _on_promoter_change(self, *_):
+        display_val = self._prom_cb_var.get()
+        key = self._prom_display_map.get(display_val, "none")
+        self._promoter_var.set(key)
+
+        if key == "none":
+            self._prom_frac_frame.pack_forget()
+        else:
+            info = PROMOTERS[key]
+            self._promoter_frac.set(str(round(info[1], 4)))
+            self._prom_hint.configure(text=info[2])
+            self._prom_frac_frame.pack(fill=tk.X, pady=(6, 0))
+
+        self._refresh_liquid_display()
+
+    def _refresh_liquid_display(self, *_):
+        """Update the H₂O / promoter fraction display label."""
+        key = self._promoter_var.get()
+        if key == "none":
+            self._liq_display.configure(text="H₂O: 1.0000")
+            return
+        try:
+            xp = float(self._promoter_frac.get())
+            xp = max(0.0, min(xp, 0.9999))
+        except ValueError:
+            xp = 0.0
+        xw = round(1.0 - xp, 6)
+        name = PROMOTERS[key][0]
+        self._liq_display.configure(text=f"H₂O: {xw:.4f}    {name}: {xp:.4f}")
+
+    # ── Temperature ───────────────────────────────────────────────────────────
 
     def _update_t_preview(self):
         try:
@@ -395,7 +533,29 @@ class LauncherApp(tk.Tk):
         except Exception:
             self._t_preview.configure(text="")
 
-    # ── Experimental data mode ────────────────────────────────────────────────
+    # ── Cache label ───────────────────────────────────────────────────────────
+
+    def _update_cache_label(self):
+        try:
+            info = get_cache().info()
+            self._cache_label.configure(
+                text=f"{info.total_entries} / {info.max_entries} entries  •  "
+                f"session: {info.hits_session} hits, "
+                f"{info.misses_session} misses  •  "
+                f"DB: {info.db_path}"
+            )
+        except Exception as exc:
+            self._cache_label.configure(text=f"Cache unavailable: {exc}")
+
+    def _on_clear_cache(self):
+        if messagebox.askyesno(
+            "Clear cache", "Delete all cached results?\nThis cannot be undone."
+        ):
+            get_cache().clear()
+            self._update_cache_label()
+            self._status_var.set("Cache cleared.")
+
+    # ── Experimental data ─────────────────────────────────────────────────────
 
     def _on_exp_mode_change(self):
         mode = self._exp_mode.get()
@@ -406,28 +566,41 @@ class LauncherApp(tk.Tk):
         elif mode == "custom":
             self._custom_frame.pack(fill=tk.X, pady=(6, 0))
 
-    # ── Input validation ──────────────────────────────────────────────────────
+    # ── Validation ────────────────────────────────────────────────────────────
 
     def _validate_inputs(self):
-        # Gas composition
-        gas_comp = {}
+        # --- Gas composition ---
+        gas_comp: dict[str, float] = {}
         total = 0.0
         for r in self._gas_rows:
             g = r["gas_var"].get()
             try:
                 f = float(r["frac_var"].get())
             except ValueError:
-                raise ValueError(f"Invalid mole fraction for gas {g}.")
+                raise ValueError(f"Invalid mole fraction for {g}.")
             if f < 0:
                 raise ValueError(f"Mole fraction for {g} cannot be negative.")
             gas_comp[g] = f
             total += f
         if abs(total - 1.0) > 1e-4:
             raise ValueError(
-                f"Mole fractions must sum to 1.0 (current sum = {total:.4f})."
+                f"Gas mole fractions must sum to 1.0  (current = {total:.4f})."
             )
 
-        # Temperature range
+        # --- Liquid composition (H₂O + optional promoter) ---
+        key = self._promoter_var.get()
+        if key == "none":
+            liq_comp = {"H2O": 1.0}
+        else:
+            try:
+                xp = float(self._promoter_frac.get())
+            except ValueError:
+                raise ValueError("Promoter mole fraction must be a number.")
+            if not (0.0 < xp < 1.0):
+                raise ValueError("Promoter mole fraction must be between 0 and 1.")
+            liq_comp = {"H2O": round(1.0 - xp, 8), key: round(xp, 8)}
+
+        # --- Temperature range ---
         try:
             tmin = float(self._T_min_var.get())
             tmax = float(self._T_max_var.get())
@@ -440,17 +613,16 @@ class LauncherApp(tk.Tk):
             raise ValueError("T_step must be positive.")
         T_range = np.arange(tmin, tmax + tstep / 2, tstep)
 
-        # EOS selection
-        eos_names = [name for name, v in self._eos_vars.items() if v.get()]
+        # --- EOS ---
+        eos_names = [n for n, v in self._eos_vars.items() if v.get()]
         if not eos_names:
             raise ValueError("Select at least one EOS model.")
 
-        # Experimental data
+        # --- Experimental data ---
         exp_data = None
         mode = self._exp_mode.get()
         if mode == "preset":
-            key = self._preset_var.get()
-            exp_data = dict(PRESET_DATA[key])
+            exp_data = dict(PRESET_DATA[self._preset_var.get()])
         elif mode == "custom":
             lines = self._custom_text.get("1.0", tk.END).strip().splitlines()
             Ts, Ps = [], []
@@ -460,15 +632,13 @@ class LauncherApp(tk.Tk):
                     continue
                 parts = ln.replace(",", " ").split()
                 if len(parts) < 2:
-                    raise ValueError(
-                        f"Cannot parse line: '{ln}'  " f"(expected T P, got '{ln}')."
-                    )
+                    raise ValueError(f"Cannot parse: '{ln}'  (expected T P).")
                 Ts.append(float(parts[0]))
                 Ps.append(float(parts[1]))
             if Ts:
                 exp_data = {"T (K)": Ts, "P_eq (MPa)": Ps}
 
-        return gas_comp, {"H2O": 1.0}, T_range, eos_names, exp_data
+        return gas_comp, liq_comp, T_range, eos_names, exp_data
 
     # ── Run ───────────────────────────────────────────────────────────────────
 
@@ -480,20 +650,42 @@ class LauncherApp(tk.Tk):
             return
 
         self._exp_data = exp_data
+
+        # ── Cache check ──────────────────────────────────────────────────────
+        cache = get_cache()
+        cached = cache.get(gas_comp, liq_comp, T_range, eos_names)
+        if cached is not None:
+            self._results = cached
+            n_total = sum(len(df) for df in cached.values())
+            self._status_var.set(
+                f"⚡  Cache HIT — {len(cached)} model(s), "
+                f"{n_total} rows loaded instantly.  Opening Plot Builder…"
+            )
+            self._update_cache_label()
+            self._open_plot_builder()
+            return
+
+        # ── Cache miss → compute ─────────────────────────────────────────────
         self._run_btn.configure(state=tk.DISABLED)
         self._progress.pack(fill=tk.X, pady=(0, 6))
         self._progress.start(12)
-        self._status_var.set("Starting calculation…")
+        self._status_var.set("Cache miss — starting calculation…")
 
         def _status_cb(msg: str):
             self.after(0, lambda m=msg: self._status_var.set(m))
 
+        # Capture for thread closure
+        _gas, _liq, _T, _eos = gas_comp, liq_comp, T_range, eos_names
+
         def _worker():
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                results, err = _run_model(
-                    gas_comp, liq_comp, T_range, eos_names, _status_cb
-                )
+                results, err = _run_model(_gas, _liq, _T, _eos, _status_cb)
+            if err is None and results:
+                try:
+                    cache.put(_gas, _liq, _T, _eos, results)
+                except Exception as ce:
+                    _status_cb(f"[cache write failed: {ce}]")
             self.after(0, lambda: self._on_done(results, err))
 
         threading.Thread(target=_worker, daemon=True).start()
@@ -502,12 +694,12 @@ class LauncherApp(tk.Tk):
         self._progress.stop()
         self._progress.pack_forget()
         self._run_btn.configure(state=tk.NORMAL)
+        self._update_cache_label()
 
         if error:
             self._status_var.set(f"⚠  Error: {error}")
             messagebox.showerror("Computation error", str(error))
             return
-
         if not results:
             self._status_var.set("⚠  No results — check inputs.")
             return
@@ -515,13 +707,10 @@ class LauncherApp(tk.Tk):
         self._results = results
         n_total = sum(len(df) for df in results.values())
         self._status_var.set(
-            f"✓  Completed  {len(results)} model(s), "
-            f"{n_total} total data rows.  "
-            "Opening Plot Builder…"
+            f"✓  Computed & cached — {len(results)} model(s), "
+            f"{n_total} total rows.  Opening Plot Builder…"
         )
         self._open_plot_builder()
-
-    # ── Open plot builder ─────────────────────────────────────────────────────
 
     def _open_plot_builder(self):
         if not self._results:

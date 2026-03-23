@@ -63,7 +63,7 @@ class JohnHolderModel:
         # Rc and a_core both in Å
         free_path = Rc - a_core
         if free_path <= 0:
-            return 0.7
+            return 0.1
 
         # Dimensionless asphericity parameter (x-axis of Fig. 1, JH 1985)
         x = omega * (sigma / free_path) * (eps_k / T0)
@@ -73,7 +73,7 @@ class JohnHolderModel:
 
         Q_star = float(np.exp(-a0 * (x ** n0)))
         # Never let Q* collapse to exactly zero (numerical safety)
-        return max(0.7, min(1.0, Q_star))
+        return max(0.1, min(1.0, Q_star))
 
     def calc_langmuir_constant(self, T, gas, cavity_type, structure):
         """Calculates the Langmuir constant C (m³/J) for a guest-cavity pair."""
@@ -107,7 +107,7 @@ class JohnHolderModel:
             C_star = 0.0
 
         Q_star = self._q_star_calculation(gas_props, struct_props, Rc)
-        print(f"Langmuir C for {gas} in {cavity_type} cage at {T} K: C*={C_star:.3e}, Q*={Q_star:.3f}")
+        # print(f"Langmuir C for {gas} in {cavity_type} cage at {T} K: C*={C_star:.3e}, Q*={Q_star:.3f}")
         return C_star * Q_star
 
     def calc_cage_occupancy(self, T, fugacities, structure, cavity_type):
