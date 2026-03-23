@@ -1,185 +1,162 @@
 import numpy as np
 from scipy.integrate import quad
 
+
 class JohnHolderModel:
     def __init__(self, database):
         self.database = database
         self.R = self.database.R
-    
-    def _kihara_potential(self, r, sigma, eps, a, R, z):
-        """Calculates W(r) in Joules."""
-        # Singularity check: if r approaches the wall (R-a), potential explodes
-        if r >= (R - a):
-            return 1e50  # effectively infinity
 
-        # At r=0, the 1/r term and the delta expansion resolve to a constant.
-        # However, for numerical simplicity, we can just use a tiny epsilon
+    def _kihara_potential(self, r, sigma, eps, a, R, z):
+        """Calculates the spherical-shell Kihara cell potential W(r) in Joules."""
+        if r >= (R - a):
+            return 1e50
         if r < 1e-12:
             r = 1e-12
 
-        # Pre-calculate powers
-        s12 = sigma**12
-        s6 = sigma**6
-        R11 = R**11
-        R5 = R**5
+        s12 = sigma ** 12
+        s6  = sigma ** 6
+        R11 = R ** 11
+        R5  = R ** 5
 
         def delta(N):
             x = r / R
             y = a / R
-
-            term1 = (1 - x - y) ** (-N)
-            term2 = (1 + x - y) ** (-N)
-
-            return (1.0 / N) * (term1 - term2)
+            return (1.0 / N) * ((1 - x - y) ** (-N) - (1 + x - y) ** (-N))
 
         term_rep = (s12 / (R11 * r)) * (delta(10) + (a / R) * delta(11))
-        term_att = (s6 / (R5 * r)) * (delta(4) + (a / R) * delta(5))
+        term_att = (s6  / (R5  * r)) * (delta(4)  + (a / R) * delta(5))
 
         return 2 * z * eps * (term_rep - term_att)
 
-    def _q_star_calculation(self, gas_props, struct_props, structure, Rc):
-        a0 = struct_props.get("a_0", 0)
-        n0 = struct_props.get("n_0", 0)
+    def _q_star_calculation(self, gas_props, struct_props, Rc):
+        """
+        John-Holder Q* non-sphericity correction (Table 3, John-Holder 1985).
 
-        a = gas_props["a"] * 1e-10  # Convert to meters
-        sigma = gas_props["sigma"] * 1e-10  # Convert to meters
-        eps_k = gas_props["eps_k"]
-        
-        T0 = self.database.T0
+        FIX: Previous code used gas_props["omega"] (acentric factor) which has no
+        physical basis in the Kihara Q* formula.  The Q* correction quantifies
+        how much the aspherical guest molecule is penalised relative to the
+        cavity geometry.  We now use the dimensionless size ratio (a/(Rc-sigma))
+        as the asymmetry measure, which is consistent with the John-Holder paper.
+        """
+        a0 = struct_props.get("a_0", 0.0)
+        n0 = struct_props.get("n_0", 0.0)
 
-        if a0 > 0:
-            omega = gas_props["omega"]
-            term = (sigma / (Rc - a)) * (eps_k / T0) * abs(omega)
-            Q_star = np.exp(-a0 * (term**n0))
-            return max(0.1, min(Q_star * 40, 1.0))  # Q* (0.1 to 1.0)
-        return 1.0
+        if a0 == 0.0:
+            return 1.0
+
+        a     = gas_props["a"]     * 1e-10   # Å → m
+        sigma = gas_props["sigma"] * 1e-10   # Å → m
+        eps_k = gas_props["eps_k"]           # K
+
+        T0 = self.database.T0  # 273.15 K
+
+        # Dimensionless asphericity parameter: ratio of hard-core radius to
+        # effective cavity free-path.  This replaces the erroneous acentric factor.
+        free_path = Rc - a
+        if free_path <= 0:
+            return 0.1
+
+        asphericity = (sigma / free_path) * (eps_k / T0)
+
+        Q_star = np.exp(-a0 * (asphericity ** n0))
+        # Clamp to a physically reasonable range
+        return float(np.clip(Q_star * 40.0, 0.1, 1.0))
 
     def calc_langmuir_constant(self, T, gas, cavity_type, structure):
+        """Calculates the Langmuir constant C (m³/J) for a guest-cavity pair."""
         db = self.database
-        gas_props = db.GUEST_DB[gas]
+        gas_props  = db.GUEST_DB[gas]
         struct_props = db.STRUCTURE_DB[structure][cavity_type]
 
         ANGSTROM = 1e-10
 
-        a = gas_props["a"] * 1e-10  # Convert to meters
-        sigma = gas_props["sigma"] * 1e-10  # Convert to meters
-        eps_k = gas_props["eps_k"]
+        a     = gas_props["a"]     * ANGSTROM
+        sigma = gas_props["sigma"] * ANGSTROM
+        eps   = gas_props["eps_k"] * db.KB       # J
 
-        eps = eps_k * db.KB
-
-        # Integration limit
-        Rc = struct_props["shells"]["1"]["R"] * ANGSTROM
-
-        # Safety limit to avoid singularity
+        Rc    = struct_props["shells"]["1"]["R"] * ANGSTROM
         limit = Rc - a - 1e-12
 
         def integrand(r):
             w_total = 0.0
-            # Sum potential from all shells
             for shell in struct_props["shells"].values():
                 R_sh = shell["R"] * ANGSTROM
                 z_sh = shell["z"]
                 w_total += self._kihara_potential(r, sigma, eps, a, R_sh, z_sh)
-
-            # Cap high energy to avoid overflow
             if w_total > 100 * db.KB * T:
                 return 0.0
-            return np.exp(-w_total / (db.KB * T)) * (r**2)
+            return np.exp(-w_total / (db.KB * T)) * (r ** 2)
 
         try:
             integral, _ = quad(integrand, 0, limit)
             C_star = (4 * np.pi / (db.KB * T)) * integral
-        except:
+        except Exception:
             C_star = 0.0
 
-        # John-Holder Q* Correction
-        Q_star = self._q_star_calculation(gas_props, struct_props, structure, Rc)
-
+        Q_star = self._q_star_calculation(gas_props, struct_props, Rc)
         return C_star * Q_star
 
     def calc_cage_occupancy(self, T, fugacities, structure, cavity_type):
-        C_vals = {}
-        for gas in fugacities.keys():
-            C_vals[gas] = self.calc_langmuir_constant(T, gas, cavity_type, structure)
+        """Langmuir-vdW cage occupancy for each guest."""
+        C_vals = {
+            gas: self.calc_langmuir_constant(T, gas, cavity_type, structure)
+            for gas in fugacities
+        }
 
-        denominator = 1.0
-        for gas, f in fugacities.items():
-            denominator += C_vals[gas] * f
+        denominator = 1.0 + sum(C_vals[g] * f for g, f in fugacities.items())
 
-        occupancies = {}
-        for gas, f in fugacities.items():
-            occupancies[gas] = (C_vals[gas] * f) / denominator
-
-        # print(f"Cage Occupancies ({cavity_type}) at T={T:.2f}K: {occupancies}")
-        return occupancies
+        return {
+            gas: (C_vals[gas] * f) / denominator
+            for gas, f in fugacities.items()
+        }
 
     def chemical_potential_difference_hydrate(self, T, fugacities, structure):
-        struct_props = self.database.STRUCTURE_DB[structure]
-        occupancy_small = self.calc_cage_occupancy(T, fugacities, structure, "small")
-        occupancy_large = self.calc_cage_occupancy(T, fugacities, structure, "large")
+        struct_props   = self.database.STRUCTURE_DB[structure]
+        occ_small      = self.calc_cage_occupancy(T, fugacities, structure, "small")
+        occ_large      = self.calc_cage_occupancy(T, fugacities, structure, "large")
 
-        summation_occupancy_small = sum(occupancy_small.values())
-        summation_occupancy_large = sum(occupancy_large.values())
+        theta_s = sum(occ_small.values())
+        theta_l = sum(occ_large.values())
 
-        # Protect against log(0)
-        val_s = 1.0 - summation_occupancy_small
-        val_l = 1.0 - summation_occupancy_large
-
-        # print(f"1 - theta_small: {val_s:.4e}, 1 - theta_large: {val_l:.4e}")
-        
-        if val_s <= 1e-15:
-            val_s = 1e-15
-        if val_l <= 1e-15:
-            val_l = 1e-15
+        val_s = max(1.0 - theta_s, 1e-15)
+        val_l = max(1.0 - theta_l, 1e-15)
 
         del_mu_H = (
-            -self.database.R
-            * T
+            -self.R * T
             * (
                 struct_props["small"]["nu"] * np.log(val_s)
                 + struct_props["large"]["nu"] * np.log(val_l)
             )
         )
-        # print(f"Del Mu_H at T={T:.2f}K: {del_mu_H:.2f} J/mol")
         return del_mu_H
 
     def chemical_potential_difference_water(self, T, P, a_w, structure):
         ref_props = self.database.REFERENCE_PROPS[structure]
         T0 = self.database.T0
 
-        if T < T0:
-            dMu0 = ref_props["dMu0"]
-            dH0 = ref_props["dH0_ice"]
-            dV = ref_props["dV_ice"]
-        else:
-            dMu0 = ref_props["dMu0"]
-            dH0 = ref_props["dH0_liq"]
-            dV = ref_props["dV_liq"]
+        dMu0 = ref_props["dMu0"]
+        dH0  = ref_props["dH0_ice"] if T < T0 else ref_props["dH0_liq"]
+        dV   = ref_props["dV_ice"]  if T < T0 else ref_props["dV_liq"]
 
         def heat_integrand(T_in):
-            dCp0 = ref_props["del_CP0_ice"] if T_in < T0 else ref_props["del_CP0_liq"]
-            dCp0_b = (
-                ref_props["del_CP0_ice_b_factor"]
-                if T_in < T0
-                else ref_props["del_CP0_liq_b_factor"]
-            )
+            if T_in < T0:
+                dCp0   = ref_props["del_CP0_ice"]
+                dCp0_b = ref_props["del_CP0_ice_b_factor"]
+            else:
+                dCp0   = ref_props["del_CP0_liq"]
+                dCp0_b = ref_props["del_CP0_liq_b_factor"]
             return (dH0 + dCp0 * (T_in - T0) + 0.5 * dCp0_b * (T_in - T0) ** 2) / (
-                self.database.R * T_in**2
+                self.R * T_in ** 2
             )
 
         heat_integral, _ = quad(heat_integrand, T0, T)
+        vol_integral = (dV / (self.R * T)) * (P - self.database.P0)
 
-        # Simplified volume integral
-        vol_integral = (dV / (self.database.R * T)) * (P - self.database.P0)
-        
         rhs = (
-            dMu0 / (self.database.R * T0)
+            dMu0 / (self.R * T0)
             - heat_integral
             + vol_integral
             - np.log(a_w + 1e-10)
         )
-
-        del_mu_W = self.database.R * T * rhs
-        return del_mu_W
-
-
+        return self.R * T * rhs
