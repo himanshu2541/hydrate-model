@@ -1,30 +1,3 @@
-"""
------------
-Central parameter store for the hydrate equilibrium model.
-
-Component taxonomy
-------------------
-GAS_DB      — molecules that appear in the **gas phase** and occupy hydrate
-              cages as the primary formers (CO₂, H₂).
-              These are passed to the EOS for fugacity calculation and to
-              the John-Holder model for Langmuir constant integration.
-
-PROMOTER_DB — molecules added to the **liquid phase** that shift the
-              hydrate equilibrium to milder conditions.  They occupy large
-              cages and are handled by the liquid-activity / promoter
-              pathway in the equilibrium solver (e.g. 1,4-Dioxane).
-              Promoters still need Kihara parameters (cavity potential)
-              and UNIFAC groups (activity coefficient), but they are never
-              used as EOS components or as gas-phase fugacity sources.
-
-GUEST_DB    — read-only property that returns the *union* of GAS_DB and
-              PROMOTER_DB.  Kept for backward-compatibility with any solver
-              or thermo-model code that iterates over all cage occupants.
-
-All other dictionaries (STRUCTURE_DB, REFERENCE_PROPS, etc.) are unchanged.
-"""
-
-
 class Database:
     def __init__(self):
         self.R = 8.314
@@ -33,30 +6,27 @@ class Database:
         self.T0 = 273.15
         self.P0 = 1.01325e5
 
-        # Keep False — see module docstring
+        # Keep False — incompatible with K&S 2000 Kihara params
         self.USE_Q_STAR: bool = False
 
         # ── Gas-phase formers ─────────────────────────────────────────────────
-        # CO2 Kihara: Klauda & Sandler 2000, Table 3
-        # H2  Kihara: Munck 1988 / Kumar 2006 / Belandria 2011
-        # Previous bad H2 values: σ=3.11, ε/k=27.2, a=0.34
         self.GAS_DB: dict = {
             "CO2": {
                 "Tc": 304.12,
                 "Pc": 73.74e5,
                 "omega": 0.225,
-                "sigma": 2.9605,
-                "eps_k": 169.09,
-                "a": 0.677,  
+                "sigma": 2.9607,  # Å  K&S 2000 Table 3
+                "eps_k": 188.97,  # K  
+                "a": 0.677,  # Å  K&S 2000 Table 3
                 "is_linear": True,
             },
             "H2": {
                 "Tc": 33.19,
                 "Pc": 13.13e5,
                 "omega": -0.216,
-                "sigma": 2.641,  
-                "eps_k": 30.15,
-                "a": 0.000, 
+                "sigma": 3.11,  
+                "eps_k": 35.2,  # K
+                "a": 0.00,  # Å 
                 "is_linear": False,
             },
         }
@@ -83,17 +53,20 @@ class Database:
         self._guest_db_cache: dict | None = None
 
         # ── Hydrate structure parameters ──────────────────────────────────────
-        # Radii and z-values: Klauda & Sandler 2000, Table 1
-        # a_0, n_0: JH1985 Q* correlation (used only when USE_Q_STAR=True)
+        # SINGLE-SHELL per cavity type — consistent with K&S 2000 Kihara params.
+        # Cavity radii (Rc) and coordination numbers (z):
+        #   K&S 2000, Table 1 / van Stackelberg & Müller 1954
+        # nu  — cavities per water molecule
+        # a_0, n_0 — JH1985 Q* correlation (only used if USE_Q_STAR=True)
         self.STRUCTURE_DB: dict = {
             "sI": {
                 "small": {
                     "type": "5^12",
                     "nu": 2 / 46,
                     "shells": {
-                        "1": {"R": 3.906, "z": 20},
+                        "1": {"R": 3.906, "z": 20},  # K&S 2000 Table 1
                         "2": {"R": 6.593, "z": 20},
-                        "3": {"R": 8.086, "z": 80},
+                        "3": {"R": 8.086, "z": 50},  
                     },
                     "a_0": 35.3446,
                     "n_0": 0.973,
@@ -102,7 +75,7 @@ class Database:
                     "type": "5^12 6^2",
                     "nu": 6 / 46,
                     "shells": {
-                        "1": {"R": 4.326, "z": 24},
+                        "1": {"R": 4.326, "z": 24},  # K&S 2000 Table 1
                         "2": {"R": 7.078, "z": 24},
                         "3": {"R": 8.285, "z": 50},
                     },
@@ -116,7 +89,7 @@ class Database:
                     "type": "5^12",
                     "nu": 16 / 136,
                     "shells": {
-                        "1": {"R": 3.902, "z": 20},
+                        "1": {"R": 3.902, "z": 20},  # K&S 2000 Table 1
                         "2": {"R": 6.667, "z": 20},
                         "3": {"R": 8.079, "z": 50},
                     },
@@ -127,7 +100,7 @@ class Database:
                     "type": "5^12 6^4",
                     "nu": 8 / 136,
                     "shells": {
-                        "1": {"R": 4.682, "z": 28},
+                        "1": {"R": 4.682, "z": 28},  # K&S 2000 Table 1
                         "2": {"R": 7.464, "z": 28},
                         "3": {"R": 8.782, "z": 50},
                     },
@@ -139,42 +112,46 @@ class Database:
         }
 
         # ── Reference chemical potential parameters ────────────────────────────
-        # Sign: Δ = (empty hydrate lattice) − (liquid water or ice)
-        # sI  — Holder et al. 1988 / Parrish & Prausnitz 1972
-        # sII — Sloan & Koh 2008, Table 4-1
-        # dH0_ice ≈ dH0_liq + 6008 (ice-fusion enthalpy at T0)
+        # Source: K&S 2000, Table 2 (self-consistent with their Kihara params).
+        #
+        # Sign: Δ = (empty hydrate lattice) − (pure liquid water reference)
+        # dMu0    : Δμ°_w at T0, P0  [J/mol]
+        # dH0_liq : Δh°_w (liquid water basis)  [J/mol]
+        # dH0_ice : Δh°_w (ice basis) = dH0_liq + ΔH_fusion_ice ≈ dH0_liq + 6008
+        # dV      : ΔV_w  [m³/mol]
+        # del_CP0_liq / _b_factor : ΔCp  [J/(mol·K)] and linear coeff [J/(mol·K²)]
         self.REFERENCE_PROPS: dict = {
             "sI": {
-                "dMu0": 1264.0,  # J/mol  (was 1120)
-                "dH0_ice": 1300.0,  # J/mol  (≈ -4858 + 6008 = 1150; rounding)
-                "dH0_liq": -4858.0,  # J/mol  (was -4297)
+                "dMu0": 1120.0,  # J/mol
+                "dH0_ice": 1714.0,  # J/mol  
+                "dH0_liq": -4297.0,  # J/mol
                 "dV_ice": 3.0e-6,
                 "dV_liq": 4.6e-6,
                 "del_CP0_ice": 3.315,
-                "del_CP0_liq": -37.32,  # J/(mol·K)  (was -34.583)
+                "del_CP0_liq": -34.582,  # J/(mol·K)
                 "del_CP0_ice_b_factor": 0.012,
-                "del_CP0_liq_b_factor": 0.179,  # J/(mol·K²)  (was 0.189)
+                "del_CP0_liq_b_factor": 0.189,  # J/(mol·K²)
                 "a_w": 0,
                 "sigma_w": 3.56438,
                 "eps_k_w": 102.134,
             },
             "sII": {
-                "dMu0": 883.0,  # J/mol  (was 931)
-                "dH0_ice": 200.0,  # J/mol
-                "dH0_liq": -5931.0,  # J/mol  (was -4611)
+                "dMu0": 931.0,  # J/mol
+                "dH0_ice": 1400.0,  # J/mol
+                "dH0_liq": -4611.0,  # J/mol
                 "dV_ice": 3.4e-6,
                 "dV_liq": 5.0e-6,
                 "del_CP0_ice": 1.029,
-                "del_CP0_liq": -41.07,  # J/(mol·K)  (was -36.86)
-                "del_CP0_ice_b_factor": 0.00377,
-                "del_CP0_liq_b_factor": 0.155,  # J/(mol·K²)  (was 0.181)
+                "del_CP0_liq": -36.861,  # J/(mol·K)
+                "del_CP0_ice_b_factor": 0.004,
+                "del_CP0_liq_b_factor": 0.181,  # J/(mol·K²)
                 "a_w": 0,
                 "sigma_w": 3.56438,
                 "eps_k_w": 102.134,
             },
         }
 
-        # ── Henry's law: Klauda & Sandler 2000, Table 4 ───────────────────────
+        # ── Henry's law: K&S 2000, Table 4 ───────────────────────────────────
         # −ln(H/P0) = H1 + H2/T + H3·ln(T) + H4·T
         self.HENRY_PARAMS: dict = {
             "CO2": {"H1": -159.868, "H2": 8742.426, "H3": 21.6712, "H4": -0.00110},

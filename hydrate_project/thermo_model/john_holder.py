@@ -39,9 +39,9 @@ class JohnHolderModel:
         Use database.USE_Q_STAR to control whether this correction is applied.
         """
         # Respect the database-level flag — keeps params and Q* consistent
-        if not getattr(self.database, "USE_Q_STAR", False):
-            return 1.0
-
+        # if not getattr(self.database, "USE_Q_STAR", False):
+        #     return 1.0
+        ANGSTROM = 1e-10
         a0 = struct_props.get("a_0", 0.0)
         n0 = struct_props.get("n_0", 0.0)
         if a0 == 0.0:
@@ -51,21 +51,21 @@ class JohnHolderModel:
         if omega <= 0.0:
             return 1.0
 
-        a_core = gas_props["a"]
-        sigma = gas_props["sigma"]
+        a_core = gas_props["a"] * ANGSTROM
+        sigma = gas_props["sigma"] * ANGSTROM
         eps_k = gas_props["eps_k"]
         T0 = self.database.T0
 
         free_path = Rc - a_core
         if free_path <= 0:
-            return 0.1
+            return 0.1  # Arbitrary small value to prevent math errors; indicates very high non-sphericity
 
         x = omega * (sigma / free_path) * (eps_k / T0)
         if x <= 0.0:
             return 1.0
 
         Q_star = float(np.exp(-a0 * (x**n0)))
-        return max(0.1, min(1.0, Q_star))
+        return Q_star
 
     def calc_langmuir_constant(self, T, gas, cavity_type, structure):
         """Calculates the Langmuir constant C (m³/J) for a guest-cavity pair."""
@@ -99,6 +99,7 @@ class JohnHolderModel:
             C_star = 0.0
 
         Q_star = self._q_star_calculation(gas_props, struct_props, Rc)
+        print(f"Langmuir C* for {gas} in {structure} {cavity_type}: {C_star:.3e} m³/J, Q*={Q_star:.3f}")
         return C_star * Q_star
 
     def calc_cage_occupancy(self, T, fugacities, structure, cavity_type):
