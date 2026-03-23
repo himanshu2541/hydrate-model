@@ -7,6 +7,7 @@ The left control panel.  All user selections are exposed via:
 Uses proper scrollable Listboxes, Combobox, Radiobuttons, Checkbuttons.
 No matplotlib widgets — pure tkinter/ttk.
 """
+
 from __future__ import annotations
 
 import tkinter as tk
@@ -14,29 +15,33 @@ from tkinter import ttk
 from dataclasses import dataclass, field
 from typing import Optional, Callable
 
-from hydrate_project.utils.general_plotter import theme as th
-from hydrate_project.utils.general_plotter.core import get_numeric_columns
+from . import theme as th
+from .core import get_numeric_columns
 
 
 # ── data class for selections ──────────────────────────────────────────────
 
+
 @dataclass
 class PlotConfig:
-    x_var:       str
-    row_vars:    list[str]
-    col_vars:    list[str]
-    comparison:  str          # "eos" | "single"
+    x_var: str
+    row_vars: list[str]
+    col_vars: list[str]
+    comparison: str  # "eos" | "single"
     exp_overlay: bool
-    dark_mode:   bool
+    dark_mode: bool
 
 
 # ── reusable widgets ───────────────────────────────────────────────────────
 
+
 class _Section(ttk.LabelFrame):
     """A styled LabelFrame used as a section card in the sidebar."""
+
     def __init__(self, parent, title: str, **kwargs):
-        super().__init__(parent, text=f"  {title}  ",
-                         style="TLabelframe", padding=(8, 6), **kwargs)
+        super().__init__(
+            parent, text=f"  {title}  ", style="TLabelframe", padding=(8, 6), **kwargs
+        )
 
 
 class _MultiListbox(ttk.Frame):
@@ -44,10 +49,17 @@ class _MultiListbox(ttk.Frame):
     A scrollable Listbox (multi-select) with a search bar.
     Exposes `.get_selected() -> list[str]` and `.set_selected(items)`.
     """
-    def __init__(self, parent, options: list[str],
-                 height: int = 7, initial: list[str] | None = None, **kwargs):
+
+    def __init__(
+        self,
+        parent,
+        options: list[str],
+        height: int = 7,
+        initial: list[str] | None = None,
+        **kwargs,
+    ):
         super().__init__(parent, style="TFrame", **kwargs)
-        self._options = options
+        self._all_options = options  # NOTE: must NOT be named _options — that shadows tkinter.Frame._options()
 
         # Search bar
         search_frame = ttk.Frame(self, style="TFrame")
@@ -57,18 +69,20 @@ class _MultiListbox(ttk.Frame):
         search_entry = tk.Entry(
             search_frame,
             textvariable=self._search_var,
-            bg=th.SURFACE0, fg=th.SUBTEXT,
+            bg=th.SURFACE0,
+            fg=th.SUBTEXT,
             insertbackground=th.TEXT,
             relief="flat",
             highlightthickness=1,
             highlightcolor=th.BLUE,
             highlightbackground=th.SURFACE1,
             font=("Segoe UI", 8),
+            disabledbackground=th.CRUST,
         )
         search_entry.pack(fill=tk.X)
         # Placeholder effect
         search_entry.insert(0, "Filter…")
-        search_entry.bind("<FocusIn>",  lambda e: self._clear_placeholder(search_entry))
+        search_entry.bind("<FocusIn>", lambda e: self._clear_placeholder(search_entry))
         search_entry.bind("<FocusOut>", lambda e: self._set_placeholder(search_entry))
 
         # Listbox + scrollbar
@@ -77,10 +91,8 @@ class _MultiListbox(ttk.Frame):
         list_frame.columnconfigure(0, weight=1)
         list_frame.rowconfigure(0, weight=1)
 
-        self._lb = th.styled_listbox(list_frame, height=height,
-                                     selectmode=tk.MULTIPLE)
-        sb = th.styled_scrollbar(list_frame, orient=tk.VERTICAL,
-                                 command=self._lb.yview)
+        self._lb = th.styled_listbox(list_frame, height=height, selectmode=tk.MULTIPLE)
+        sb = th.styled_scrollbar(list_frame, orient=tk.VERTICAL, command=self._lb.yview)
         self._lb.config(yscrollcommand=sb.set)
         self._lb.grid(row=0, column=0, sticky="nsew")
         sb.grid(row=0, column=1, sticky="ns")
@@ -98,12 +110,14 @@ class _MultiListbox(ttk.Frame):
             entry.config(fg=th.SUBTEXT)
 
     def _on_search(self, *_):
+        if not hasattr(self, "_lb"):  # guard: trace can fire before _lb is assigned
+            return
         query = self._search_var.get().lower()
         if query == "filter…":
             query = ""
         current = self.get_selected()
         self._populate(
-            [o for o in self._options if query in o.lower()],
+            [o for o in self._all_options if query in o.lower()],
             current,
         )
 
@@ -128,14 +142,18 @@ class _MultiListbox(ttk.Frame):
 
 
 class _RadioGroup(ttk.Frame):
-    def __init__(self, parent, options: list[tuple[str, str]],
-                 default: str = "", **kwargs):
+    def __init__(
+        self, parent, options: list[tuple[str, str]], default: str = "", **kwargs
+    ):
         super().__init__(parent, style="TFrame", **kwargs)
         self._var = tk.StringVar(value=default)
         for value, label in options:
             rb = ttk.Radiobutton(
-                self, text=label, value=value,
-                variable=self._var, style="TRadiobutton",
+                self,
+                text=label,
+                value=value,
+                variable=self._var,
+                style="TRadiobutton",
             )
             rb.pack(anchor=tk.W, pady=2)
 
@@ -147,6 +165,7 @@ class _RadioGroup(ttk.Frame):
 
 
 # ── main sidebar ───────────────────────────────────────────────────────────
+
 
 class Sidebar(ttk.Frame):
     """
@@ -173,18 +192,20 @@ class Sidebar(ttk.Frame):
 
     WIDTH = 260
 
-    def __init__(self, parent,
-                 results_dict: dict,
-                 on_update: Callable,
-                 on_save: Callable,
-                 **kwargs):
-        super().__init__(parent, style="Sidebar.TFrame",
-                         width=self.WIDTH, **kwargs)
+    def __init__(
+        self,
+        parent,
+        results_dict: dict,
+        on_update: Callable,
+        on_save: Callable,
+        **kwargs,
+    ):
+        super().__init__(parent, style="Sidebar.TFrame", width=self.WIDTH, **kwargs)
         self.pack_propagate(False)
 
         self._on_update = on_update
-        self._on_save   = on_save
-        self._columns   = get_numeric_columns(results_dict)
+        self._on_save = on_save
+        self._columns = get_numeric_columns(results_dict)
         self._eos_names = list(results_dict.keys())
 
         self._build_header()
@@ -195,8 +216,9 @@ class Sidebar(ttk.Frame):
         hdr = ttk.Frame(self, style="Sidebar.TFrame", padding=(12, 12, 12, 8))
         hdr.pack(fill=tk.X)
         ttk.Label(hdr, text="⚙  Plot Builder", style="Title.TLabel").pack(anchor=tk.W)
-        ttk.Label(hdr, text="Configure and preview your chart grid",
-                  style="Subtitle.TLabel").pack(anchor=tk.W, pady=(2, 0))
+        ttk.Label(
+            hdr, text="Configure and preview your chart grid", style="Subtitle.TLabel"
+        ).pack(anchor=tk.W, pady=(2, 0))
         ttk.Separator(self, orient="horizontal").pack(fill=tk.X)
 
     # ── scrollable body ────────────────────────────────────────────────────
@@ -205,10 +227,8 @@ class Sidebar(ttk.Frame):
         outer = ttk.Frame(self, style="Sidebar.TFrame")
         outer.pack(fill=tk.BOTH, expand=True)
 
-        canvas = tk.Canvas(outer, bg=th.MANTLE,
-                           highlightthickness=0, bd=0)
-        vsb = th.styled_scrollbar(outer, orient=tk.VERTICAL,
-                                  command=canvas.yview)
+        canvas = tk.Canvas(outer, bg=th.MANTLE, highlightthickness=0, bd=0)
+        vsb = th.styled_scrollbar(outer, orient=tk.VERTICAL, command=canvas.yview)
         canvas.configure(yscrollcommand=vsb.set)
 
         vsb.pack(side=tk.RIGHT, fill=tk.Y)
@@ -219,6 +239,7 @@ class Sidebar(ttk.Frame):
 
         def _on_frame_config(e):
             canvas.configure(scrollregion=canvas.bbox("all"))
+
         def _on_canvas_config(e):
             canvas.itemconfig(inner_id, width=e.width)
 
@@ -228,6 +249,7 @@ class Sidebar(ttk.Frame):
         # Mousewheel scrolling
         def _on_scroll(e):
             canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+
         canvas.bind_all("<MouseWheel>", _on_scroll)
 
         self._populate_sections(inner)
@@ -239,32 +261,42 @@ class Sidebar(ttk.Frame):
         # ── X Axis ─────────────────────────────────────────────────────────
         sec_x = _Section(parent, "X Axis")
         sec_x.pack(**PAD)
-        x_opts = [c for c in self._columns if c in ("T (K)", "P_eq (MPa)")] \
-                 + [c for c in self._columns if c not in ("T (K)", "P_eq (MPa)")]
+        x_opts = [c for c in self._columns if c in ("T (K)", "P_eq (MPa)")] + [
+            c for c in self._columns if c not in ("T (K)", "P_eq (MPa)")
+        ]
         self._x_var = tk.StringVar(value=x_opts[0] if x_opts else "")
-        x_cb = ttk.Combobox(sec_x, textvariable=self._x_var,
-                            values=x_opts, state="readonly",
-                            style="TCombobox", font=("Segoe UI", 9))
+        x_cb = ttk.Combobox(
+            sec_x,
+            textvariable=self._x_var,
+            values=x_opts,
+            state="readonly",
+            style="TCombobox",
+            font=("Segoe UI", 9),
+        )
         x_cb.pack(fill=tk.X)
 
         # ── Row Variables ──────────────────────────────────────────────────
         sec_row = _Section(parent, "Row Variables  (Y-left)")
         sec_row.pack(**PAD)
-        ttk.Label(sec_row,
-                  text="Ctrl+click to select multiple",
-                  style="Muted.TLabel").pack(anchor=tk.W, pady=(0, 4))
-        self._row_lb = _MultiListbox(sec_row, self._columns, height=7,
-                                     initial=["P_eq (MPa)"])
+        ttk.Label(
+            sec_row, text="Ctrl+click to select multiple", style="Muted.TLabel"
+        ).pack(anchor=tk.W, pady=(0, 4))
+        self._row_lb = _MultiListbox(
+            sec_row, self._columns, height=7, initial=["P_eq (MPa)"]
+        )
         self._row_lb.pack(fill=tk.BOTH, expand=True)
 
         # ── Col Variables ──────────────────────────────────────────────────
-        sec_col = _Section(parent, "Col Variables  (Y-right / twin)")
+        sec_col = _Section(parent, "Col Variables  (Y panels)")
         sec_col.pack(**PAD)
-        ttk.Label(sec_col,
-                  text="Overlaid on twin right axis",
-                  style="Muted.TLabel").pack(anchor=tk.W, pady=(0, 4))
-        self._col_lb = _MultiListbox(sec_col, self._columns, height=7,
-                                     initial=["Theta_Small_CO2"])
+        ttk.Label(
+            sec_col,
+            text="Each selection = one column of subplots",
+            style="Muted.TLabel",
+        ).pack(anchor=tk.W, pady=(0, 4))
+        self._col_lb = _MultiListbox(
+            sec_col, self._columns, height=7, initial=["Theta_Small_CO2"]
+        )
         self._col_lb.pack(fill=tk.BOTH, expand=True)
 
         # ── Comparison Mode ────────────────────────────────────────────────
@@ -273,7 +305,7 @@ class Sidebar(ttk.Frame):
         self._comp_radio = _RadioGroup(
             sec_cmp,
             options=[
-                ("eos",    f"Overlay all  ({len(self._eos_names)} EOS models)"),
+                ("eos", f"Overlay all  ({len(self._eos_names)} EOS models)"),
                 ("single", f"Single  ({self._eos_names[0]})"),
             ],
             default="eos",
@@ -283,35 +315,44 @@ class Sidebar(ttk.Frame):
         # ── Options ────────────────────────────────────────────────────────
         sec_opt = _Section(parent, "Options")
         sec_opt.pack(**PAD)
-        self._exp_var  = tk.BooleanVar(value=True)
-        self._dark_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(sec_opt, text="Show experimental data",
-                        variable=self._exp_var,
-                        style="TCheckbutton").pack(anchor=tk.W, pady=2)
-        ttk.Checkbutton(sec_opt, text="Dark plot background",
-                        variable=self._dark_var,
-                        style="TCheckbutton").pack(anchor=tk.W, pady=2)
+        self._exp_var = tk.BooleanVar(value=True)
+        self._dark_var = tk.BooleanVar(value=False)  # light by default
+        ttk.Checkbutton(
+            sec_opt,
+            text="Show experimental data",
+            variable=self._exp_var,
+            style="TCheckbutton",
+        ).pack(anchor=tk.W, pady=2)
+        ttk.Checkbutton(
+            sec_opt,
+            text="Dark plot background",
+            variable=self._dark_var,
+            style="TCheckbutton",
+        ).pack(anchor=tk.W, pady=2)
 
         # ── Action buttons ─────────────────────────────────────────────────
         btn_frame = ttk.Frame(parent, style="Sidebar.TFrame")
         btn_frame.pack(fill=tk.X, pady=(4, 8))
 
-        ttk.Button(btn_frame, text="▶   Update Plot",
-                   style="Primary.TButton",
-                   command=self._on_update).pack(fill=tk.X, pady=(0, 6))
-        ttk.Button(btn_frame, text="💾   Save PNG",
-                   style="TButton",
-                   command=self._on_save).pack(fill=tk.X)
+        ttk.Button(
+            btn_frame,
+            text="▶   Update Plot",
+            style="Primary.TButton",
+            command=self._on_update,
+        ).pack(fill=tk.X, pady=(0, 6))
+        ttk.Button(
+            btn_frame, text="💾   Save PNG", style="TButton", command=self._on_save
+        ).pack(fill=tk.X)
 
     # ── public API ─────────────────────────────────────────────────────────
     def get_config(self) -> PlotConfig:
         rows = self._row_lb.get_selected() or ["P_eq (MPa)"]
         cols = self._col_lb.get_selected() or ["T (K)"]
         return PlotConfig(
-            x_var       = self._x_var.get() or "T (K)",
-            row_vars    = rows,
-            col_vars    = cols,
-            comparison  = self._comp_radio.get(),
-            exp_overlay = self._exp_var.get(),
-            dark_mode   = self._dark_var.get(),
+            x_var=self._x_var.get() or "T (K)",
+            row_vars=rows,
+            col_vars=cols,
+            comparison=self._comp_radio.get(),
+            exp_overlay=self._exp_var.get(),
+            dark_mode=self._dark_var.get(),
         )

@@ -4,6 +4,7 @@ canvas.py
 Wraps a matplotlib Figure inside a ttk Frame with a slim custom toolbar.
 Provides `update_plot()` to redraw with new data.
 """
+
 from __future__ import annotations
 
 import tkinter as tk
@@ -18,26 +19,31 @@ from . import theme as th
 
 class _SlimToolbar(NavigationToolbar2Tk):
     """Navigation toolbar with only the most useful tools and dark styling."""
+
     toolitems = (
-        ("Home",    "Reset original view",  "home",    "home"),
-        ("Back",    "Previous view",         "back",    "back"),
-        ("Forward", "Next view",             "forward", "forward"),
+        ("Home", "Reset original view", "home", "home"),
+        ("Back", "Previous view", "back", "back"),
+        ("Forward", "Next view", "forward", "forward"),
         (None, None, None, None),
-        ("Pan",     "Pan axes",              "move",    "pan"),
-        ("Zoom",    "Zoom to rectangle",     "zoom_to_rect", "zoom"),
+        ("Pan", "Pan axes", "move", "pan"),
+        ("Zoom", "Zoom to rectangle", "zoom_to_rect", "zoom"),
         (None, None, None, None),
-        ("Save",    "Save figure",           "filesave","save_figure"),
+        ("Save", "Save figure", "filesave", "save_figure"),
     )
 
     def __init__(self, canvas, parent):
         super().__init__(canvas, parent, pack_toolbar=False)
-        self.config(background=th.MANTLE)
+        from . import theme as _th
+
+        self.config(background=_th.MANTLE)
         for child in self.winfo_children():
             try:
-                child.config(background=th.MANTLE,
-                             foreground=th.TEXT,
-                             relief="flat",
-                             activebackground=th.SURFACE1)
+                child.config(
+                    background=_th.MANTLE,
+                    foreground=_th.TEXT,
+                    relief="flat",
+                    activebackground=_th.CRUST,
+                )
             except Exception:
                 pass
 
@@ -56,8 +62,9 @@ class PlotCanvas(ttk.Frame):
         super().__init__(parent, **kwargs)
         self.configure(style="TFrame")
 
-        self.fig = Figure(figsize=figsize, dpi=dpi,
-                          facecolor=th.BASE, tight_layout=True)
+        self.fig = Figure(
+            figsize=figsize, dpi=dpi, facecolor=th.BASE, tight_layout=True
+        )
 
         self._canvas = FigureCanvasTkAgg(self.fig, master=self)
         self._canvas_widget = self._canvas.get_tk_widget()
@@ -78,6 +85,7 @@ class PlotCanvas(ttk.Frame):
         return self.fig
 
     def save_png(self, filepath: str, dpi: int = 150):
-        self.fig.savefig(filepath, dpi=dpi, bbox_inches="tight",
-                         facecolor=self.fig.get_facecolor())
+        self.fig.savefig(
+            filepath, dpi=dpi, bbox_inches="tight", facecolor=self.fig.get_facecolor()
+        )
         print(f"[PlotCanvas] Saved → {filepath}")

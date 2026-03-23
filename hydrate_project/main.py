@@ -7,7 +7,7 @@ from hydrate_project.core.database import Database
 from hydrate_project.thermo_model.john_holder import JohnHolderModel as HydrateModel
 from hydrate_project.eos_model.pr_eos import PREOS
 from hydrate_project.solvers.equilibrium import EquilibriumSolver
-from hydrate_project.utils.visualize import HydrateVisualizer
+# from hydrate_project.utils.visualize import HydrateVisualizer
 from hydrate_project.utils.general_plotter import GeneralPlotter
 from hydrate_project.utils.metrics import calculate_aad
 
@@ -139,12 +139,12 @@ def main():
         print(f"{eos_name:<25}: {score:.2f}%")
     print("=" * 40)
 
-    # ── Standard plots ─────────────────────────────────────────────
-    print("\nGenerating EOS Comparison Graph...")
-    HydrateVisualizer.plot_eos_comparison(all_results, experimental_data)
+    # # ── Standard plots ─────────────────────────────────────────────
+    # print("\nGenerating EOS Comparison Graph...")
+    # HydrateVisualizer.plot_eos_comparison(all_results, experimental_data)
 
-    print("Generating Cage Occupancy Graph (Peng-Robinson)...")
-    HydrateVisualizer.plot_cage_occupancies(all_results["Peng-Robinson"])
+    # print("Generating Cage Occupancy Graph (Peng-Robinson)...")
+    # HydrateVisualizer.plot_cage_occupancies(all_results["Peng-Robinson"])
 
     # ── General grid plotter ────────────────────────────────────────
     print("Launching General Plot Builder...")

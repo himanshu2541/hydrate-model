@@ -1,7 +1,7 @@
 """
 theme.py
 --------
-Applies a cohesive dark (Catppuccin Mocha-inspired) ttk.Style to a Tk root.
+Applies a clean light ttk.Style to a Tk root.
 Call `apply(root)` before building any widgets.
 """
 
@@ -10,27 +10,27 @@ import tkinter as tk
 from tkinter import ttk
 
 # ── palette ────────────────────────────────────────────────────────────────
-BASE = "#1e1e2e"  # window background
-MANTLE = "#181825"  # darker surface
-CRUST = "#11111b"  # deepest surface
-SURFACE0 = "#313244"  # card / panel bg
-SURFACE1 = "#45475a"  # border / divider
-SURFACE2 = "#585b70"  # muted elements
+BASE = "#ffffff"  # window background
+MANTLE = "#f4f4f5"  # sidebar / panel background
+CRUST = "#e4e4e7"  # deepest surface
+SURFACE0 = "#fafafa"  # card / input background
+SURFACE1 = "#d4d4d8"  # border / divider
+SURFACE2 = "#a1a1aa"  # muted border / active
 
-TEXT = "#cdd6f4"  # primary text
-SUBTEXT = "#a6adc8"  # secondary text
-OVERLAY = "#6c7086"  # placeholder / disabled
+TEXT = "#18181b"  # primary text
+SUBTEXT = "#52525b"  # secondary text
+OVERLAY = "#a1a1aa"  # placeholder / disabled
 
-BLUE = "#89b4fa"
-GREEN = "#a6e3a1"
-MAUVE = "#cba6f7"
-PEACH = "#fab387"
-RED = "#f38ba8"
-YELLOW = "#f9e2af"
+BLUE = "#2563eb"  # primary accent
+GREEN = "#16a34a"  # success
+MAUVE = "#7c3aed"  # purple
+PEACH = "#ea580c"  # orange
+RED = "#dc2626"  # danger
+YELLOW = "#ca8a04"  # warning
 
 BTN_BG = SURFACE0
-BTN_HOVER = SURFACE1
-BTN_ACTIVE = SURFACE2
+BTN_HOVER = CRUST
+BTN_ACTIVE = SURFACE1
 BTN_PRIMARY = BLUE
 ACCENT = BLUE
 
@@ -39,7 +39,6 @@ def apply(root: tk.Tk | tk.Toplevel):
     """Configure the ttk.Style for the entire application."""
     style = ttk.Style(root)
 
-    # Use clam as the base (works on all platforms)
     try:
         style.theme_use("clam")
     except Exception:
@@ -51,11 +50,11 @@ def apply(root: tk.Tk | tk.Toplevel):
         ".",
         background=BASE,
         foreground=TEXT,
-        fieldbackground=MANTLE,
-        troughcolor=MANTLE,
+        fieldbackground=SURFACE0,
+        troughcolor=CRUST,
         bordercolor=SURFACE1,
-        darkcolor=CRUST,
-        lightcolor=SURFACE0,
+        darkcolor=SURFACE1,
+        lightcolor=BASE,
         selectbackground=BLUE,
         selectforeground=BASE,
         insertcolor=TEXT,
@@ -132,7 +131,7 @@ def apply(root: tk.Tk | tk.Toplevel):
     )
     style.map(
         "Primary.TButton",
-        background=[("active", MAUVE), ("pressed", "#7287fd")],
+        background=[("active", MAUVE), ("pressed", "#1d4ed8")],
         foreground=[("active", BASE)],
     )
 
@@ -144,7 +143,7 @@ def apply(root: tk.Tk | tk.Toplevel):
         relief="flat",
         padding=(10, 6),
     )
-    style.map("Danger.TButton", background=[("active", "#eba0ac")])
+    style.map("Danger.TButton", background=[("active", "#ef4444")])
 
     style.configure(
         "Success.TButton",
@@ -154,7 +153,7 @@ def apply(root: tk.Tk | tk.Toplevel):
         relief="flat",
         padding=(10, 6),
     )
-    style.map("Success.TButton", background=[("active", "#94e2b8")])
+    style.map("Success.TButton", background=[("active", "#15803d")])
 
     # ── Checkbutton ───────────────────────────────────────────────────────
     style.configure(
@@ -191,7 +190,7 @@ def apply(root: tk.Tk | tk.Toplevel):
         fieldbackground=SURFACE0,
         background=SURFACE0,
         foreground=TEXT,
-        arrowcolor=TEXT,
+        arrowcolor=SUBTEXT,
         bordercolor=SURFACE1,
         selectbackground=BLUE,
         selectforeground=BASE,
@@ -207,10 +206,10 @@ def apply(root: tk.Tk | tk.Toplevel):
     # ── Scrollbar ─────────────────────────────────────────────────────────
     style.configure(
         "TScrollbar",
-        background=SURFACE0,
+        background=CRUST,
         troughcolor=MANTLE,
-        arrowcolor=OVERLAY,
-        bordercolor=MANTLE,
+        arrowcolor=SUBTEXT,
+        bordercolor=SURFACE1,
         relief="flat",
         arrowsize=12,
     )
@@ -223,14 +222,14 @@ def apply(root: tk.Tk | tk.Toplevel):
     style.configure("TNotebook", background=BASE, bordercolor=SURFACE1)
     style.configure(
         "TNotebook.Tab",
-        background=SURFACE0,
+        background=MANTLE,
         foreground=SUBTEXT,
         padding=(12, 5),
         bordercolor=SURFACE1,
     )
     style.map(
         "TNotebook.Tab",
-        background=[("selected", BASE), ("active", SURFACE1)],
+        background=[("selected", BASE), ("active", CRUST)],
         foreground=[("selected", TEXT)],
     )
 
@@ -241,7 +240,7 @@ def apply(root: tk.Tk | tk.Toplevel):
 
 
 def styled_listbox(parent, **kwargs) -> tk.Listbox:
-    """Return a dark-themed tk.Listbox with consistent colours."""
+    """Return a light-themed tk.Listbox with consistent colours."""
     defaults = dict(
         bg=SURFACE0,
         fg=TEXT,
@@ -251,7 +250,7 @@ def styled_listbox(parent, **kwargs) -> tk.Listbox:
         relief="flat",
         borderwidth=0,
         highlightthickness=1,
-        highlightcolor=SURFACE1,
+        highlightcolor=BLUE,
         highlightbackground=SURFACE1,
         font=("Segoe UI", 9),
         exportselection=False,
