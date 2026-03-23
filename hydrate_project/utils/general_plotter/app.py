@@ -1,17 +1,12 @@
 """
 app.py
 ------
-Main application window.  Owns the layout:
+Plot-builder window.  Two flavours:
 
-  ┌──────────────┬──────────────────────────────────────────┐
-  │              │  toolbar                                 │
-  │   Sidebar    ├──────────────────────────────────────────┤
-  │  (controls)  │                                          │
-  │              │         PlotCanvas (matplotlib)          │
-  │              │                                          │
-  └──────────────┴──────────────────────────────────────────┘
+  PlotBuilderApp    – standalone root Tk window  (direct launch)
+  PlotBuilderWindow – Toplevel child window       (inside LauncherApp)
 
-Keyboard shortcut: Enter / Return → update plot.
+Both share identical behaviour through _PlotBuilderMixin.
 """
 
 from __future__ import annotations
@@ -27,48 +22,28 @@ from hydrate_project.utils.general_plotter.sidebar import Sidebar
 from hydrate_project.utils.general_plotter.core import build_grid
 
 
-class PlotBuilderApp(tk.Tk):
-    """Top-level window for the General Plotter."""
+class _PlotBuilderMixin:
+    """All UI and logic shared between the Tk and Toplevel variants."""
 
-    def __init__(
-        self,
-        results_dict: dict,
-        experimental_data: Optional[dict] = None,
-        title: str = "Hydrate — General Plot Builder",
-    ):
-        super().__init__()
+    def _init_content(self, results_dict, experimental_data, title):
         self._results = results_dict
         self._exp_data = experimental_data
-
-        # ── window setup ───────────────────────────────────────────────────
         self.title(title)
         self.geometry("1400x820")
         self.minsize(900, 600)
         th.apply(self)
         self._set_icon()
-
-        # ── layout ─────────────────────────────────────────────────────────
         self._build_layout()
-
-        # ── status bar ─────────────────────────────────────────────────────
         self._build_statusbar()
-
-        # ── keybindings ────────────────────────────────────────────────────
         self.bind("<Return>", lambda _e: self._on_update())
         self.bind("<Control-s>", lambda _e: self._on_save())
-
-        # ── initial draw ───────────────────────────────────────────────────
         self.after(100, self._on_update)
-
-    # ── layout builders ────────────────────────────────────────────────────
 
     def _build_layout(self):
         main = ttk.Frame(self, style="TFrame")
         main.pack(fill=tk.BOTH, expand=True)
         main.columnconfigure(1, weight=1)
         main.rowconfigure(0, weight=1)
-
-        # Sidebar
         self._sidebar = Sidebar(
             main,
             results_dict=self._results,
@@ -76,15 +51,9 @@ class PlotBuilderApp(tk.Tk):
             on_save=self._on_save,
         )
         self._sidebar.grid(row=0, column=0, sticky="nsew")
-
-        # Vertical divider
-        ttk.Separator(main, orient="vertical").grid(
-            row=0, column=1, sticky="ns", padx=0
-        )
-
-        # Canvas
+        ttk.Separator(main, orient="vertical").grid(row=0, column=1, sticky="ns")
         self._canvas = PlotCanvas(main, figsize=(13, 8), dpi=96)
-        self._canvas.grid(row=0, column=2, sticky="nsew", padx=0)
+        self._canvas.grid(row=0, column=2, sticky="nsew")
         main.columnconfigure(2, weight=1)
 
     def _build_statusbar(self):
@@ -102,15 +71,12 @@ class PlotBuilderApp(tk.Tk):
         )
 
     def _set_icon(self):
-        """Try to set a minimal window icon."""
         try:
             icon = tk.PhotoImage(width=16, height=16)
             icon.put(th.BLUE, to=(0, 0, 15, 15))
             self.iconphoto(True, icon)
         except Exception:
             pass
-
-    # ── callbacks ──────────────────────────────────────────────────────────
 
     def _on_update(self, *_):
         cfg = self._sidebar.get_config()
@@ -129,9 +95,9 @@ class PlotBuilderApp(tk.Tk):
                 dark=cfg.dark_mode,
             )
             self._canvas.draw()
-            n_cells = len(cfg.row_vars) * len(cfg.col_vars)
+            n = len(cfg.row_vars) * len(cfg.col_vars)
             self._status_var.set(
-                f"✓  {n_cells} panel{'s' if n_cells != 1 else ''} drawn  •  "
+                f"✓  {n} panel{'s' if n != 1 else ''} drawn  •  "
                 f"{len(cfg.row_vars)} row(s) × {len(cfg.col_vars)} col(s)  •  "
                 f"x={cfg.x_var}  •  mode={cfg.comparison}"
             )
@@ -141,11 +107,10 @@ class PlotBuilderApp(tk.Tk):
 
     def _on_save(self, *_):
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_name = f"hydrate_plot_{ts}.png"
         path = filedialog.asksaveasfilename(
             defaultextension=".png",
             filetypes=[("PNG image", "*.png"), ("PDF", "*.pdf"), ("All files", "*.*")],
-            initialfile=default_name,
+            initialfile=f"hydrate_plot_{ts}.png",
             title="Save plot as…",
         )
         if path:
@@ -161,3 +126,30 @@ class PlotBuilderApp(tk.Tk):
                 self._status_var.set(f"✓  Saved → {path}")
             except Exception as exc:
                 messagebox.showerror("Save error", str(exc))
+
+
+class PlotBuilderApp(_PlotBuilderMixin, tk.Tk):
+    """Standalone root-window — use when launching directly."""
+
+    def __init__(
+        self,
+        results_dict,
+        experimental_data=None,
+        title="Hydrate — General Plot Builder",
+    ):
+        tk.Tk.__init__(self)
+        self._init_content(results_dict, experimental_data, title)
+
+
+class PlotBuilderWindow(_PlotBuilderMixin, tk.Toplevel):
+    """Toplevel child window — use when embedded inside LauncherApp."""
+
+    def __init__(
+        self,
+        master,
+        results_dict,
+        experimental_data=None,
+        title="Hydrate — General Plot Builder",
+    ):
+        tk.Toplevel.__init__(self, master)
+        self._init_content(results_dict, experimental_data, title)

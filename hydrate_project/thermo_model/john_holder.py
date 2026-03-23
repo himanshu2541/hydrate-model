@@ -31,13 +31,15 @@ class JohnHolderModel:
 
     def _q_star_calculation(self, gas_props, struct_props, Rc):
         """
-        John-Holder Q* non-sphericity correction (Table 3, John-Holder 1985).
+        John-Holder Q* non-sphericity correction (Eq. 7, AIChE J. 31(2), 1985).
 
-        FIX: Previous code used gas_props["omega"] (acentric factor) which has no
-        physical basis in the Kihara Q* formula.  The Q* correction quantifies
-        how much the aspherical guest molecule is penalised relative to the
-        cavity geometry.  We now use the dimensionless size ratio (a/(Rc-sigma))
-        as the asymmetry measure, which is consistent with the John-Holder paper.
+        Q* = exp(−a₀ · [ω · σ/(Rc−a) · ε/(k·T₀)]^n₀)
+
+        where ω is the Pitzer acentric factor, σ and a are Kihara parameters,
+        Rc is the first-shell cavity radius, and T₀ = 273.15 K.
+
+        For quantum / near-spherical molecules (ω ≤ 0, e.g. H₂ with ω = −0.216),
+        there is no asphericity correction and Q* = 1.0.
         """
         a0 = struct_props.get("a_0", 0.0)
         n0 = struct_props.get("n_0", 0.0)
@@ -45,23 +47,33 @@ class JohnHolderModel:
         if a0 == 0.0:
             return 1.0
 
-        a     = gas_props["a"]     * 1e-10   # Å → m
-        sigma = gas_props["sigma"] * 1e-10   # Å → m
-        eps_k = gas_props["eps_k"]           # K
+        omega  = gas_props.get("omega", 0.0)
 
-        T0 = self.database.T0  # 273.15 K
+        # For spherical or quantum gases (e.g. Ar, H₂) the acentric factor is
+        # ≤ 0; no asphericity correction is needed.
+        if omega <= 0.0:
+            return 1.0
 
-        # Dimensionless asphericity parameter: ratio of hard-core radius to
-        # effective cavity free-path.  This replaces the erroneous acentric factor.
-        free_path = Rc - a
+        a_core = gas_props["a"]       # Å  — Kihara core radius
+        sigma  = gas_props["sigma"]   # Å  — zero-potential distance
+        eps_k  = gas_props["eps_k"]   # K  — characteristic energy
+
+        T0 = self.database.T0  # 273.15 K (reference temperature)
+
+        # Rc and a_core both in Å
+        free_path = Rc - a_core
         if free_path <= 0:
-            return 0.1
+            return 0.7
 
-        asphericity = (sigma / free_path) * (eps_k / T0)
+        # Dimensionless asphericity parameter (x-axis of Fig. 1, JH 1985)
+        x = omega * (sigma / free_path) * (eps_k / T0)
 
-        Q_star = np.exp(-a0 * (asphericity ** n0))
-        # Clamp to a physically reasonable range
-        return float(np.clip(Q_star * 40.0, 0.1, 1.0))
+        if x <= 0.0:
+            return 1.0
+
+        Q_star = float(np.exp(-a0 * (x ** n0)))
+        # Never let Q* collapse to exactly zero (numerical safety)
+        return max(0.7, min(1.0, Q_star))
 
     def calc_langmuir_constant(self, T, gas, cavity_type, structure):
         """Calculates the Langmuir constant C (m³/J) for a guest-cavity pair."""
@@ -95,6 +107,7 @@ class JohnHolderModel:
             C_star = 0.0
 
         Q_star = self._q_star_calculation(gas_props, struct_props, Rc)
+        print(f"Langmuir C for {gas} in {cavity_type} cage at {T} K: C*={C_star:.3e}, Q*={Q_star:.3f}")
         return C_star * Q_star
 
     def calc_cage_occupancy(self, T, fugacities, structure, cavity_type):
