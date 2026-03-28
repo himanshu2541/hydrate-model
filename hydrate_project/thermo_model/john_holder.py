@@ -30,14 +30,6 @@ class JohnHolderModel:
         return 2 * z * eps * (term_rep - term_att)
 
     def _q_star_calculation(self, gas_props, struct_props, Rc):
-        """
-        John-Holder Q* non-sphericity correction (JH1985 Eq. 7).
-
-        IMPORTANT: This correction is only self-consistent when used with the
-        JH1985 Table-6 Kihara parameters.  The current database uses K&S 2000
-        / Munck 1988 parameters that were fitted with Q*=1 (spherical cell).
-        Use database.USE_Q_STAR to control whether this correction is applied.
-        """
         # Respect the database-level flag — keeps params and Q* consistent
         # if not getattr(self.database, "USE_Q_STAR", False):
         #     return 1.0
@@ -64,8 +56,7 @@ class JohnHolderModel:
         if x <= 0.0:
             return 1.0
 
-        Q_star = float(np.exp(-a0 * (x**n0)))
-        return Q_star
+        return float(np.exp(-a0 * (x**n0)))
 
     def calc_langmuir_constant(self, T, gas, cavity_type, structure):
         """Calculates the Langmuir constant C (m³/J) for a guest-cavity pair."""

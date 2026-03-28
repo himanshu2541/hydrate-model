@@ -153,8 +153,33 @@ class Database:
 
         # ── Henry's law: K&S 2000, Table 4 ───────────────────────────────────
         # −ln(H/P0) = H1 + H2/T + H3·ln(T) + H4·T
+        #
+        # CO2 : Klauda & Sandler 2000, Table 4.
+        #
+        # H2  : K&S 2000 do not include H2.  Parameters fitted here to
+        #        Battino (IUPAC Solubility Data Series, Vol. 5/6, 1981/1984)
+        #        experimental mole-fraction solubility data in the hydrate
+        #        temperature window (273–300 K):
+        #
+        #          T = 273.15 K → x_H2 = 1.776×10⁻⁵ → kH = 5.706×10⁹ Pa
+        #          T = 278.15 K → x_H2 = 1.628×10⁻⁵ → kH = 6.224×10⁹ Pa
+        #          T = 283.15 K → x_H2 = 1.511×10⁻⁵ → kH = 6.706×10⁹ Pa
+        #          T = 298.15 K → x_H2 = 1.400×10⁻⁵ → kH = 7.237×10⁹ Pa
+        #
+        #        Two-parameter least-squares (H3 = H4 = 0) over 273–298 K:
+        #          H1 = -13.767,  H2 = 772.7
+        #
+        #        This gives kH ≈ 5 880 MPa at 276 K, vs. the erroneous
+        #        fallback of 1 000 MPa that caused ~1.7 MPa underprediction
+        #        of equilibrium pressure in CO2/H2 mixture hydrates.
+        #
+        #        Root cause of the bug: without this entry, calc_henry_constant
+        #        returned 1e9 Pa (1 000 MPa), overestimating x_H2 by ~6×,
+        #        which lowered a_w and mu_w, so the bisection solver found
+        #        equilibrium at too-low pressure.
         self.HENRY_PARAMS: dict = {
             "CO2": {"H1": -159.868, "H2": 8742.426, "H3": 21.6712, "H4": -0.00110},
+            "H2":  {"H1":  -13.767, "H2":    772.7,  "H3":    0.0,  "H4":   0.0},
         }
 
         # ── Modified UNIFAC (Dahl, Fredenslund & Rasmussen 1991) ──────────────
