@@ -147,5 +147,5 @@ class JohnHolderModel:
         heat_integral, _ = quad(heat_integrand, T0, T)
         vol_integral = (dV / (self.R * T)) * (P - self.database.P0)
 
-        rhs = dMu0 / (self.R * T0) - heat_integral + vol_integral + np.log(a_w + 1e-10)
+        rhs = dMu0 / (self.R * T0) - heat_integral + vol_integral + np.log(a_w + 1e-12)
         return self.R * T * rhs

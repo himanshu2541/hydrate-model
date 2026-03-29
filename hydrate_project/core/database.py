@@ -15,17 +15,17 @@ class Database:
                 "Tc": 304.12,
                 "Pc": 73.74e5,
                 "omega": 0.225,
-                "sigma": 2.9607,  # Å  K&S 2000 Table 3
+                "sigma": 2.9681,  # Å  K&S 2000 Table 3
                 "eps_k": 188.97,  # K  
-                "a": 0.677,  # Å  K&S 2000 Table 3
+                "a": 0.6805,  # Å  K&S 2000 Table 3
                 "is_linear": True,
             },
             "H2": {
                 "Tc": 33.19,
                 "Pc": 13.13e5,
                 "omega": -0.216,
-                "sigma": 3.11,  
-                "eps_k": 35.2,  # K
+                "sigma": 2.916,  
+                "eps_k": 31.31,  # K
                 "a": 0.00,  # Å 
                 "is_linear": False,
             },
@@ -122,7 +122,7 @@ class Database:
         # del_CP0_liq / _b_factor : ΔCp  [J/(mol·K)] and linear coeff [J/(mol·K²)]
         self.REFERENCE_PROPS: dict = {
             "sI": {
-                "dMu0": 1120.0,  # J/mol
+                "dMu0": 1130.0,  # J/mol
                 "dH0_ice": 1714.0,  # J/mol  
                 "dH0_liq": -4297.0,  # J/mol
                 "dV_ice": 3.0e-6,
@@ -149,6 +149,17 @@ class Database:
                 "sigma_w": 3.56438,
                 "eps_k_w": 102.134,
             },
+        }
+
+
+        self.KIJ_DB: dict = {
+            ('CO2', 'CO2'): 0.0,
+            ('H2', 'H2'): 0.0,
+            ('CO2', 'H2'): -0.017,  # Crucial for accurate CO2-H2 mixture fugacity
+            ('H2', 'CO2'): -0.017,  # Keep it symmetric
+            # Ensure your other interactions (like water) are defined
+            ('CO2', 'H2O'): 0.1896, # Standard PR value for CO2-H2O
+            ('H2', 'H2O'): 0.0      # H2/H2O interaction is negligible
         }
 
         # ── Henry's law: K&S 2000, Table 4 ───────────────────────────────────
