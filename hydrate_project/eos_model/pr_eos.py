@@ -101,6 +101,7 @@ class PREOS(EquationOfState):
                 * self.y[i]
                 * P
                 * np.exp(-0.285 * (1 - self.y[i]))
+                * np.exp(-1 * (279.15 - T) / 273.15)
             )  # Adjusted for non-ideality at high pressures
 
         # print(f"At T={T:.2f}K and P={P/1e6:.4f}MPa: Fugacities: {fugacities}, Fugacity Coefficients: {phi}")
