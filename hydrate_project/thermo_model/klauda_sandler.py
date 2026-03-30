@@ -29,6 +29,7 @@ class KlaudaSandlerModel:
         self.database = database
         self.R = database.R
         self.kihara_params = {}
+
     # ── Kihara cell potential ──────────────────────────────────────────────
 
     def _kihara_shell_potential(self, r, sigma, eps, a, R_shell, z):
@@ -63,28 +64,30 @@ class KlaudaSandlerModel:
         ANGSTROM = 1e-10
         db = self.database
 
-        if gas+structure not in self.kihara_params:
-          # Guest: from the K&S-specific Tee et al. table
-          ks = db.KS_KIHARA_PARAMS
-          gp = ks.get(gas, db.GAS_DB[gas])  # fall back to GAS_DB if missing
-          wp = ks["H2O"]
+        if gas + structure not in self.kihara_params:
+            # Guest: from the K&S-specific Tee et al. table
+            ks = db.KS_KIHARA_PARAMS
+            gp = ks.get(gas, db.GAS_DB[gas])  # fall back to GAS_DB if missing
+            wp = ks["H2O"]
 
-          a_g = gp["a"] * ANGSTROM
-          s_g = gp["sigma"] * ANGSTROM
-          e_g = gp["eps_k"] * db.KB
+            a_g = gp["a"] * ANGSTROM
+            s_g = gp["sigma"] * ANGSTROM
+            e_g = gp["eps_k"] * db.KB
 
-          a_w = wp["a"] * ANGSTROM
-          s_w = wp["sigma"] * ANGSTROM
-          e_w = wp["eps_k"] * db.KB
+            a_w = wp["a"] * ANGSTROM
+            s_w = wp["sigma"] * ANGSTROM
+            e_w = wp["eps_k"] * db.KB
 
-          a = (a_g + a_w) / 2.0
-          sigma = (s_g + s_w) / 2.0
-          eps = np.sqrt(e_g * e_w)
-          print(f"Combined Kihara params for {gas} in {structure}: a={a} m, σ={sigma} m, ε={eps} J")
-          self.kihara_params[gas+structure] = (a, sigma, eps)
-          return a, sigma, eps
+            a = (a_g + a_w) / 2.0
+            sigma = (s_g + s_w) / 2.0
+            eps = np.sqrt(e_g * e_w)
+            print(
+                f"Combined Kihara params for {gas} in {structure}: a={a} m, σ={sigma} m, ε={eps} J"
+            )
+            self.kihara_params[gas + structure] = (a, sigma, eps)
+            return a, sigma, eps
         else:
-          return self.kihara_params[gas+structure]
+            return self.kihara_params[gas + structure]
 
     # ── Langmuir constant ─────────────────────────────────────────────────
 
@@ -159,31 +162,51 @@ class KlaudaSandlerModel:
         p = self.database.WATER_VP_PARAMS[phase]
         return p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
 
-    def _mixture_vp_params(self, fugacities, structure):
+    def _mixture_vp_params(self, T, fugacities, structure):
         """
-        Fugacity-weighted average of K&S Table 6 parameters.
-        For pure systems this is exact; for mixtures it is the recommended
-        first-order mixing rule (K&S 2003 approach).
+        Hydrate-occupancy weighted average of K&S Table 6 parameters.
+        (K&S 2003 mixing rule for mixtures).
         """
         vp_db = self.database.KS_VAPOR_PRESSURE_PARAMS[structure]
-        total = sum(fugacities.values())
-        if total <= 0.0:
+
+        # Optimization: if pure gas, skip occupancy math
+        if len(fugacities) == 1:
+            gas = next(iter(fugacities))
+            return vp_db.get(gas, next(iter(vp_db.values())))
+
+        # Calculate actual hydrate occupancies for mixing weights
+        occ_s = self.calc_cage_occupancy(T, fugacities, structure, "small")
+        occ_l = self.calc_cage_occupancy(T, fugacities, structure, "large")
+
+        sp = self.database.STRUCTURE_DB[structure]
+        nu_s = sp["small"]["nu"]
+        nu_l = sp["large"]["nu"]
+
+        hydrate_moles = {}
+        total_moles = 0.0
+        for gas in fugacities.keys():
+            moles = nu_s * occ_s.get(gas, 0.0) + nu_l * occ_l.get(gas, 0.0)
+            hydrate_moles[gas] = moles
+            total_moles += moles
+
+        if total_moles <= 0.0:
             gas = next(iter(fugacities))
             return vp_db.get(gas, next(iter(vp_db.values())))
 
         A = B = C = D = 0.0
-        for gas, f in fugacities.items():
-            w = f / total
+        for gas in fugacities.keys():
+            w = hydrate_moles[gas] / total_moles  # Hydrate-free basis fraction
             p = vp_db.get(gas, next(iter(vp_db.values())))
             A += w * p["A"]
             B += w * p["B"]
             C += w * p["C"]
             D += w * p["D"]
+
         return {"A": A, "B": B, "C": C, "D": D}
 
     def _ln_psat_empty_hydrate(self, T, fugacities, structure):
         """ln(P_sat^β [Pa]) using mixture-averaged QL1 parameters."""
-        p = self._mixture_vp_params(fugacities, structure)
+        p = self._mixture_vp_params(T, fugacities, structure)
         return p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
 
     # ── Molar volumes ──────────────────────────────────────────────────────
@@ -197,15 +220,13 @@ class KlaudaSandlerModel:
         P_MPa = P / 1e6
         if structure == "sI":
             Nw = 46.0
-            Vt = (11.835 + 2.217e-5 * T + 2.242e-6 * T**2) * 1e-30 * NA / Nw
+            a_sI = 11.835 + 2.217e-5 * T + 2.242e-6 * T**2
+            Vt = (a_sI**3) * 1e-30 * NA / Nw
         else:  # sII
             Nw = 136.0
-            Vt = (
-                (17.13 + 2.249e-4 * T + 2.013e-6 * T**2 + 1.009e-9 * T**3)
-                * 1e-30
-                * NA
-                / Nw
-            )
+            a_sII = 17.13 + 2.249e-4 * T + 2.013e-6 * T**2 + 1.009e-9 * T**3
+            Vt = (a_sII**3) * 1e-30 * NA / Nw
+
         Vc = -8.006e-9 * P_MPa + 5.448e-12 * P_MPa**2
         return Vt + Vc
 
