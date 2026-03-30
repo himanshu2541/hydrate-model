@@ -160,15 +160,26 @@ class EquilibriumSolver:
             state[f"Theta_Large_{gas}"] = occ_large.get(gas, 0)
             state[f"z_Hyd_{gas}"] = z_hydrate[gas]
 
+        # Calculate Ideal Separation Factor (Enrichment Ratio)
         if len(self.eos.gases) >= 2:
             gas1, gas2 = self.eos.gases[0], self.eos.gases[1]
-            y1, y2 = self.eos.y[0], self.eos.y[1]
-            if y1 > 0 and y2 > 0 and z_hydrate.get(gas2, 0) > 0:
-                state[f"SF_{gas1}_{gas2}"] = (z_hydrate[gas1] / y1) / (
-                    z_hydrate[gas2] / y2
-                )
+            y1 = self.eos.y[
+                0
+            ]  # Mole fraction of primary gas (e.g., CO2) in the vapor phase
+
+            if y1 > 0:
+                # Defined as: y_gas_hydrate / y_gas_vapor
+                state[f"SF_{gas1}_{gas2}"] = z_hydrate[gas1] / y1
             else:
                 state[f"SF_{gas1}_{gas2}"] = np.nan
+
+        # Optional: Track the ideal separation factor for EVERY gas individually
+        for i, gas in enumerate(self.eos.gases):
+            y_gas = self.eos.y[i]
+            if y_gas > 0:
+                state[f"Ideal_SF_{gas}"] = z_hydrate[gas] / y_gas
+            else:
+                state[f"Ideal_SF_{gas}"] = np.nan
 
         return state
 

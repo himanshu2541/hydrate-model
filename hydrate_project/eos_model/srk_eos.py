@@ -88,7 +88,7 @@ class SRKEOS(EquationOfState):
     def calc_fugacities(self, T, P):
         phi = self._calc_fugacity_coefficients(T, P)
         fugacities = {
-            gas: phi[i] * self.y[i] * P * np.exp(-0.4 * (1 - self.y[i]))
+            gas: phi[i] * self.y[i] * P # * np.exp(-0.4 * (1 - self.y[i]))
             for i, gas in enumerate(self.gases)
         }
         return fugacities, phi

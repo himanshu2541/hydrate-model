@@ -6,8 +6,8 @@ class Database:
         self.T0 = 273.15
         self.P0 = 1.01325e5
 
-        # Keep False — incompatible with K&S 2000 Kihara params
-        self.USE_Q_STAR: bool = False
+        # # Keep False — incompatible with K&S 2000 Kihara params
+        # self.USE_Q_STAR: bool = False
 
         # ── Gas-phase formers ─────────────────────────────────────────────────
         self.GAS_DB: dict = {
@@ -15,9 +15,9 @@ class Database:
                 "Tc": 304.12,
                 "Pc": 73.74e5,
                 "omega": 0.225,
-                "sigma": 2.9681,  # Å  K&S 2000 Table 3
-                "eps_k": 188.97,  # K  
-                "a": 0.6805,  # Å  K&S 2000 Table 3
+                "sigma": 2.9608, 
+                "eps_k":  188.97,  # K  
+                "a":  0.677,
                 "is_linear": True,
             },
             "H2": {
@@ -122,7 +122,7 @@ class Database:
         # del_CP0_liq / _b_factor : ΔCp  [J/(mol·K)] and linear coeff [J/(mol·K²)]
         self.REFERENCE_PROPS: dict = {
             "sI": {
-                "dMu0": 1130.0,  # J/mol
+                "dMu0": 1120.0,  # J/mol
                 "dH0_ice": 1714.0,  # J/mol  
                 "dH0_liq": -4297.0,  # J/mol
                 "dV_ice": 3.0e-6,
