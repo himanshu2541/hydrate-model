@@ -108,7 +108,8 @@ def _run_model(
     """Run solver for every selected EOS.  Returns (results_dict, error)."""
     try:
         from hydrate_project.core.database import Database
-        from hydrate_project.thermo_model.john_holder import JohnHolderModel
+        # from hydrate_project.thermo_model.john_holder import JohnHolderModel
+        from hydrate_project.thermo_model.klauda_sandler import KlaudaSandlerModel
         from hydrate_project.eos_model.pr_eos import PREOS
         from hydrate_project.eos_model.srk_eos import SRKEOS
         from hydrate_project.eos_model.pt_eos import PTEOS
@@ -121,7 +122,7 @@ def _run_model(
         }
 
         db = Database()
-        hydrate_core = JohnHolderModel(database=db)
+        hydrate_core = KlaudaSandlerModel(database=db)
         results: dict[str, pd.DataFrame] = {}
 
         for eos_name in eos_names:

@@ -106,7 +106,7 @@ class EquilibriumSolver:
             T, P, aw_val, structure
         )
         mu_h = self.hydrate_model.chemical_potential_difference_hydrate(
-            T, f_dict, structure
+            T, f_dict, structure, P=P
         )
 
         occ_small = self.hydrate_model.calc_cage_occupancy(
@@ -200,7 +200,7 @@ class EquilibriumSolver:
                 T, P, aw_val, structure
             )
             mu_h = self.hydrate_model.chemical_potential_difference_hydrate(
-                T, f_dict, structure
+                T, f_dict, structure, P=P
             )
             return mu_w - mu_h
 

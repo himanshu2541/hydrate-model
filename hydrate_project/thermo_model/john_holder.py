@@ -141,7 +141,7 @@ class JohnHolderModel:
             
         return occupancies
 
-    def chemical_potential_difference_hydrate(self, T, fugacities, structure):
+    def chemical_potential_difference_hydrate(self, T, fugacities, structure, P=None):
         struct_props = self.database.STRUCTURE_DB[structure]
         occ_small = self.calc_cage_occupancy(T, fugacities, structure, "small")
         occ_large = self.calc_cage_occupancy(T, fugacities, structure, "large")

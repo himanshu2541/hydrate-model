@@ -9,6 +9,55 @@ class Database:
         # # Keep False — incompatible with K&S 2000 Kihara params
         # self.USE_Q_STAR: bool = False
 
+        # ── K&S 2000 Table 3 corrected Kihara params (Tee et al. 1966) ────────────
+        # NOTE: The existing GAS_DB CO2 params (sigma=2.9608, eps_k=188.97) are
+        #       NOT the Tee et al. values. K&S requires these specific values.
+        self.KS_KIHARA_PARAMS: dict = {
+            "CH4":     {"sigma": 3.505,  "eps_k": 232.2,   "a": 0.28},
+            "C2H6":    {"sigma": 4.022,  "eps_k": 404.3,   "a": 0.574},
+            "C3H8":    {"sigma": 4.519,  "eps_k": 493.71,  "a": 0.6502},
+            "i-C4H10": {"sigma": 4.746,  "eps_k": 628.6,   "a": 0.859},
+            "H2S":     {"sigma": 3.607,  "eps_k": 459.6,   "a": 0.3508},
+            "N2":      {"sigma": 3.469,  "eps_k": 142.1,   "a": 0.341},
+            "CO2":     {"sigma": 3.335,  "eps_k": 513.85,  "a": 0.677},
+            # H2: not in K&S 2000; Tee et al. 1966 spherical-core values
+            "H2":      {"sigma": 2.958,  "eps_k": 37.0,    "a": 0.000},
+            # Water (K&S Table 3)
+            "H2O":     {"sigma": 3.564,  "eps_k": 102.134, "a": 0.000},
+        }
+
+        # ── K&S 2000 Table 6: empty hydrate lattice vapor pressure (QL1 form) ─────
+        # ln(P_sat^β [Pa]) = A*ln(T) + B/T + C + D*T
+        # C = 2.7789 for all (fitted to CH4 sI I-H-V only, then held fixed)
+        self.KS_VAPOR_PRESSURE_PARAMS: dict = {
+            "sI": {
+                "CH4":    {"A": 4.6477, "B": -5242.9790, "C": 2.7789, "D": -8.7156e-3},
+                "C2H6":   {"A": 4.6766, "B": -5263.9565, "C": 2.7789, "D": -9.0154e-3},
+                "CO2":    {"A": 4.6188, "B": -5020.8289, "C": 2.7789, "D": -8.3455e-3},
+                "H2S":    {"A": 4.6446, "B": -5150.3690, "C": 2.7789, "D": -8.7553e-3},
+                "c-C3H6": {"A": 4.6652, "B": -5424.1108, "C": 2.7789, "D": -8.8658e-3},
+                # H2 not in K&S; use CO2 params for sI (CO2 dominates CO2/H2 sI mixture)
+                "H2":     {"A": 4.6188, "B": -5020.8289, "C": 2.7789, "D": -8.3455e-3},
+            },
+            "sII": {
+                "N2":      {"A": 5.1511, "B": -5595.4346, "C": 2.7789, "D": -16.0445e-3},
+                "C3H8":    {"A": 5.2578, "B": -5650.5584, "C": 2.7789, "D": -16.2021e-3},
+                "i-C4H10": {"A": 4.6818, "B": -5455.2664, "C": 2.7789, "D": -8.9678e-3},
+                "c-C3H6":  {"A": 5.1449, "B": -5544.3272, "C": 2.7789, "D": -14.8446e-3},
+                # H2 in sII: use N2 params (both are small, non-polar; N2 is the closest match)
+                "H2":      {"A": 5.1511, "B": -5595.4346, "C": 2.7789, "D": -16.0445e-3},
+                # CO2 can form sII under some conditions; use sI params
+                "CO2":     {"A": 4.6188, "B": -5020.8289, "C": 2.7789, "D": -8.3455e-3},
+            },
+        }
+
+        # ── K&S 2000 Table 5: QL1 vapor pressure of pure water phases ─────────────
+        # ln(P_sat [Pa]) = A*ln(T) + B/T + C + D*T
+        self.WATER_VP_PARAMS: dict = {
+            "ice":    {"A": 4.6056, "B": -5501.1243, "C": 2.9446, "D": -8.1431e-3},
+            "liquid": {"A": 4.1539, "B": -5500.9332, "C": 7.6537, "D": -16.1277e-3},
+        }
+
         # ── Gas-phase formers ─────────────────────────────────────────────────
         self.GAS_DB: dict = {
             "CO2": {
