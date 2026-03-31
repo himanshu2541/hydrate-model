@@ -6,8 +6,6 @@ class Database:
         self.T0 = 273.15
         self.P0 = 1.01325e5
 
-        # # Keep False — incompatible with K&S 2000 Kihara params
-        # self.USE_Q_STAR: bool = False
 
         # ── K&S 2000 Table 3 corrected Kihara params (Tee et al. 1966) ────────────
         # NOTE: The existing GAS_DB CO2 params (sigma=2.9608, eps_k=188.97) are
@@ -64,18 +62,18 @@ class Database:
                 "Tc": 304.12,
                 "Pc": 73.74e5,
                 "omega": 0.225,
-                "sigma": 2.9608, 
-                "eps_k":  188.97,  # K  
-                "a":  0.677,
+                "sigma": self.KS_KIHARA_PARAMS["CO2"]["sigma"], 
+                "eps_k":  self.KS_KIHARA_PARAMS["CO2"]["eps_k"],  # K  
+                "a":  self.KS_KIHARA_PARAMS["CO2"]["a"],  # Å
                 "is_linear": True,
             },
             "H2": {
                 "Tc": 33.19,
                 "Pc": 13.13e5,
                 "omega": -0.216,
-                "sigma": 2.916,  
-                "eps_k": 31.31,  # K
-                "a": 0.00,  # Å 
+                "sigma": self.KS_KIHARA_PARAMS["H2"]["sigma"],
+                "eps_k": self.KS_KIHARA_PARAMS["H2"]["eps_k"],  # K
+                "a": self.KS_KIHARA_PARAMS["H2"]["a"],  # Å 
                 "is_linear": False,
             },
         }
@@ -237,9 +235,10 @@ class Database:
         #        returned 1e9 Pa (1 000 MPa), overestimating x_H2 by ~6×,
         #        which lowered a_w and mu_w, so the bisection solver found
         #        equilibrium at too-low pressure.
+        # K&S 2003 Table 1: Henry constants
         self.HENRY_PARAMS: dict = {
             "CO2": {"H1": -159.868, "H2": 8742.426, "H3": 21.6712, "H4": -0.00110},
-            "H2":  {"H1":  -13.767, "H2":    772.7,  "H3":    0.0,  "H4":   0.0},
+            "H2":  {"H1":  -86.8550, "H2":    4178.717,  "H3":    10.4935,  "H4":   0.00632},
         }
 
         # ── Modified UNIFAC (Dahl, Fredenslund & Rasmussen 1991) ──────────────

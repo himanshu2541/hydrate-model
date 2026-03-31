@@ -29,30 +29,7 @@ class KlaudaSandlerModel:
         self.database = database
         self.R = database.R
         self.kihara_params = {}
-
-    # ── Kihara cell potential ──────────────────────────────────────────────
-
-    def _kihara_shell_potential(self, r, sigma, eps, a, R_shell, z):
-        """
-        Spherically-averaged Kihara cell potential for one shell.
-        K&S Eqs. 6-7.  Returns potential in Joules.
-        """
-        if r >= (R_shell - a):
-            return 1e50
-        if r < 1e-12:
-            r = 1e-12
-
-        def delta(N):
-            x = r / R_shell
-            y = a / R_shell
-            return (1.0 / N) * ((1 - x - y) ** (-N) - (1 + x - y) ** (-N))
-
-        s12 = sigma**12
-        s6 = sigma**6
-        term_rep = (s12 / (R_shell**11 * r)) * (delta(10) + (a / R_shell) * delta(11))
-        term_att = (s6 / (R_shell**5 * r)) * (delta(4) + (a / R_shell) * delta(5))
-        return 2 * z * eps * (term_rep - term_att)
-
+    
     def _get_combined_kihara(self, gas, structure):
         """
         Lorentz-Berthelot combining rules (K&S Eq. 13):
@@ -64,10 +41,10 @@ class KlaudaSandlerModel:
         ANGSTROM = 1e-10
         db = self.database
 
-        if gas + structure not in self.kihara_params:
+        if str(gas + structure) not in self.kihara_params:
             # Guest: from the K&S-specific Tee et al. table
             ks = db.KS_KIHARA_PARAMS
-            gp = ks.get(gas, db.GAS_DB[gas])  # fall back to GAS_DB if missing
+            gp = ks.get(gas, db.GUEST_DB[gas])  # fall back to GAS_DB if missing
             wp = ks["H2O"]
 
             a_g = gp["a"] * ANGSTROM
@@ -84,11 +61,40 @@ class KlaudaSandlerModel:
             print(
                 f"Combined Kihara params for {gas} in {structure}: a={a} m, σ={sigma} m, ε={eps} J"
             )
-            self.kihara_params[gas + structure] = (a, sigma, eps)
+            self.kihara_params[str(gas + structure)] = (a, sigma, eps)
             return a, sigma, eps
         else:
-            return self.kihara_params[gas + structure]
+            return self.kihara_params[str(gas + structure)]
 
+
+    # ── Kihara cell potential ──────────────────────────────────────────────
+
+    def _kihara_shell_potential(self, r, sigma, eps, a, R_shell, z):
+        """
+        Spherically-averaged Kihara cell potential for one shell.
+        K&S Eqs. 6-7.  Returns potential in Joules.
+        """
+        if r >= (R_shell - a):
+            return 1e50
+
+        def delta(N):
+            x = r / R_shell
+            y = a / R_shell
+            return (1.0 / N) * ((1 - x - y) ** (-N) - (1 + x - y) ** (-N))
+
+        s12 = sigma**12
+        s6 = sigma**6
+        term_rep = (s12 / (R_shell**11 * r)) * (
+            delta(10) + (a / R_shell) * delta(11)
+        )  # unitless
+        term_att = (s6 / (R_shell**5 * r)) * (
+            delta(4) + (a / R_shell) * delta(5)
+        )  # unitless
+
+        w_r = 2 * z * eps * (term_rep - term_att)  # in Joules
+        return w_r
+
+    
     # ── Langmuir constant ─────────────────────────────────────────────────
 
     def calc_langmuir_constant(self, T, gas, cavity_type, structure):
@@ -99,37 +105,35 @@ class KlaudaSandlerModel:
         """
         db = self.database
         ANGSTROM = 1e-10
-        a, sigma, eps = self._get_combined_kihara(gas, structure)
+        struct_props = db.STRUCTURE_DB[structure][cavity_type]
+        a, sigma, eps = self._get_combined_kihara(gas, structure)  # returns in SI units
 
-        shells = db.STRUCTURE_DB[structure][cavity_type]["shells"]
-        R1 = shells["1"]["R"] * ANGSTROM
-        limit = R1 - a - 1e-12
-
-        # Pre-compute outer shell contributions at r→0 (centre)
-        W_outer = 0.0
-        for key in ["2", "3"]:
-            if key in shells:
-                R_sh = shells[key]["R"] * ANGSTROM
-                z_sh = shells[key]["z"]
-                W_outer += self._kihara_shell_potential(
-                    1e-12, sigma, eps, a, R_sh, z_sh
-                )
+        R1 = struct_props["shells"]["1"]["R"] * ANGSTROM  # convert to Angstroms
+        limit = R1 - a  # in Angstroms
 
         def integrand(r):
-            R1_sh = shells["1"]["R"] * ANGSTROM
-            z1 = shells["1"]["z"]
-            W1 = self._kihara_shell_potential(r, sigma, eps, a, R1_sh, z1)
-            W = W1 + W_outer
-            if W > 100 * db.KB * T:
-                return 0.0
-            return np.exp(-W / (db.KB * T)) * r * r
+            w_total = 0.0
+            for shell in struct_props["shells"].values():
+                R_sh = shell["R"] * ANGSTROM  # convert to Angstroms
+                z_sh = shell["z"]
+                w_total += self._kihara_shell_potential(
+                    r, sigma, eps, a, R_sh, z_sh
+                )  # in Joules
 
+            if w_total > 100 * db.KB * T:
+                return 0.0
+            return np.exp(-w_total / (db.KB * T)) * r * r
+        
         try:
-            val, _ = quad(integrand, 0.0, limit, limit=200)
-            C = (4.0 * np.pi / (db.KB * T)) * val
+            integral, _ = quad(integrand, 1e-12, limit)
+            C = (4 * np.pi / (db.KB * T)) * integral # in m³/J
         except Exception:
             C = 0.0
-        return max(C, 0.0)
+
+        print(
+            f"[C] Calculated Langmuir constant for {gas} in {structure} with {cavity_type}: C = {C}"
+        )
+        return C 
 
     def calc_cage_occupancy(self, T, fugacities, structure, cavity_type):
         """Standard Langmuir occupancy (vdWP Eq. 3)."""
@@ -150,6 +154,9 @@ class KlaudaSandlerModel:
         sp = self.database.STRUCTURE_DB[structure]
         occ_s = self.calc_cage_occupancy(T, fugacities, structure, "small")
         occ_l = self.calc_cage_occupancy(T, fugacities, structure, "large")
+        print(
+            f"Calculated cage occupancies for Δμ_w^H at T={T} K in {structure}: small={occ_s}, large={occ_l}"
+        )
         ts = max(1.0 - sum(occ_s.values()), 1e-15)
         tl = max(1.0 - sum(occ_l.values()), 1e-15)
         return -(sp["small"]["nu"] * np.log(ts) + sp["large"]["nu"] * np.log(tl))
@@ -160,7 +167,8 @@ class KlaudaSandlerModel:
         """ln(P_sat [Pa]) for ice (T<T0) or liquid water. K&S Table 5."""
         phase = "ice" if T < self.database.T0 else "liquid"
         p = self.database.WATER_VP_PARAMS[phase]
-        return p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
+        ln_psat = p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
+        return ln_psat
 
     def _mixture_vp_params(self, T, fugacities, structure):
         """
@@ -207,7 +215,8 @@ class KlaudaSandlerModel:
     def _ln_psat_empty_hydrate(self, T, fugacities, structure):
         """ln(P_sat^β [Pa]) using mixture-averaged QL1 parameters."""
         p = self._mixture_vp_params(T, fugacities, structure)
-        return p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
+        ln_psat = p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
+        return ln_psat
 
     # ── Molar volumes ──────────────────────────────────────────────────────
 
@@ -221,11 +230,11 @@ class KlaudaSandlerModel:
         if structure == "sI":
             Nw = 46.0
             a_sI = 11.835 + 2.217e-5 * T + 2.242e-6 * T**2
-            Vt = (a_sI**3) * 1e-30 * NA / Nw
+            Vt = (a_sI) * 1e-30 * NA / Nw
         else:  # sII
             Nw = 136.0
             a_sII = 17.13 + 2.249e-4 * T + 2.013e-6 * T**2 + 1.009e-9 * T**3
-            Vt = (a_sII**3) * 1e-30 * NA / Nw
+            Vt = (a_sII) * 1e-30 * NA / Nw
 
         Vc = -8.006e-9 * P_MPa + 5.448e-12 * P_MPa**2
         return Vt + Vc
@@ -254,12 +263,17 @@ class KlaudaSandlerModel:
         """
         ln_Psat_b = self._ln_psat_empty_hydrate(T, fugacities, structure)
         Psat_b = np.exp(ln_Psat_b)
+        print(f"Empty hydrate vapor pressure at T={T} K: P_sat = {Psat_b} Pa")
         V_b = self._V_hydrate(T, P, structure)
         # Fugacity of empty lattice (Poynting)
         ln_f_beta = ln_Psat_b + V_b * (P - Psat_b) / (self.R * T)
         # Subtract Δμ_w^H / RT  (positive value → reduces fugacity)
         dmu = self._delta_mu_hydrate_over_RT(T, fugacities, structure)
-        return ln_f_beta - dmu
+        ln_f_w_H = ln_f_beta - dmu
+        print(
+            f"Hydrate-side water fugacity at T={T} K, P={P} Pa: f_w^H = {np.exp(ln_f_w_H)} Pa"
+        )
+        return ln_f_w_H
 
     def _ln_fugacity_water_phase(self, T, P, a_w):
         """
@@ -268,6 +282,7 @@ class KlaudaSandlerModel:
         """
         ln_Psat_w = self._ln_psat_water(T)
         Psat_w = np.exp(ln_Psat_w)
+        print(f"Water vapor pressure at T={T} K: P_sat = {Psat_w} Pa")
         if T < self.database.T0:
             V_w = self._V_ice(T)
             ln_fw = ln_Psat_w + V_w * (P - Psat_w) / (self.R * T)
@@ -276,6 +291,9 @@ class KlaudaSandlerModel:
             ln_fw = (
                 np.log(max(a_w, 1e-15)) + ln_Psat_w + V_w * (P - Psat_w) / (self.R * T)
             )
+        print(
+            f"Water-side water fugacity at T={T} K, P={P} Pa, a_w={a_w}: f_w^π = {np.exp(ln_fw)} Pa"
+        )
         return ln_fw
 
     # ── Solver-compatible interface ────────────────────────────────────────
@@ -285,7 +303,11 @@ class KlaudaSandlerModel:
 
     def chemical_potential_difference_water(self, T, P, a_w, structure):
         """Returns RT · ln(f_w^π) — used as 'mu_w' in solver objective."""
-        return self.R * T * self._ln_fugacity_water_phase(T, P, a_w)
+        mu_W = self.R * T * self._ln_fugacity_water_phase(T, P, a_w)
+        print(
+            f"Calculated water chemical potential difference (RT·ln(f_w^π)) at T={T} K, P={P} Pa, a_w={a_w}: {mu_W} J/mol"
+        )
+        return mu_W
 
     def chemical_potential_difference_hydrate(self, T, fugacities, structure, P=None):
         """
@@ -296,15 +318,9 @@ class KlaudaSandlerModel:
         if P is None:
             # Rough estimate: ignore Poynting (diagnostic only)
             P = 1e6
-        return self.R * T * self._ln_fugacity_hydrate_water(T, P, fugacities, structure)
 
-    # ── Compatibility shims (called by _calculate_state) ──────────────────
-
-    def calc_cage_occupancy(self, T, fugacities, structure, cavity_type):
-        """Already defined above — exposed for EquilibriumSolver._calculate_state."""
-        C = {
-            g: self.calc_langmuir_constant(T, g, cavity_type, structure)
-            for g in fugacities
-        }
-        denom = 1.0 + sum(C[g] * f for g, f in fugacities.items())
-        return {g: C[g] * f / denom for g, f in fugacities.items()}
+        mu_H = self.R * T * self._ln_fugacity_hydrate_water(T, P, fugacities, structure)
+        print(
+            f"Calculated hydrate chemical potential difference (RT·ln(f_w^H)) at T={T} K, P={P} Pa: {mu_H} J/mol"
+        )
+        return mu_H

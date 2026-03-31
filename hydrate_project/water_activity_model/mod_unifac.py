@@ -168,7 +168,6 @@ class ModifiedUnifac:
         # H = P0 * exp(-rhs)
         H_pa = self.database.P0 * np.exp(-rhs)  # in Pa
 
-        # print(f"Henry's Law Constant for {gas} at T={T:.2f}K: H = {H_pa:.2e} Pa")
         return H_pa
 
     def calc_activity_coefficients(self, T, P):

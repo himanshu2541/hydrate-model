@@ -47,9 +47,9 @@ class JohnHolderModel:
         # print(f"Gas params (SI): a_g={a_g} m, sigma_g={sigma_g} m, eps_g={eps_g} J")
         # print(f"Water params (SI): a_w={a_w} m, sigma_w={sigma_w} m, eps_w={eps_w} J")
         # print(f"Calculated Kihara params: a={a} m, sigma={sigma} m, eps={eps} J")
-        # return a, sigma, eps
+        return a, sigma, eps
     
-        return a_g, sigma_g, eps_g
+        # return a_g, sigma_g, eps_g
 
 
     def _q_star_calculation(self, gas_props, struct_props, reference_props, Rc):
@@ -83,7 +83,7 @@ class JohnHolderModel:
     def calc_langmuir_constant(self, T, gas, cavity_type, structure):
         """Calculates the Langmuir constant C (m³/J) for a guest-cavity pair."""
         db = self.database
-        gas_props = db.GAS_DB[gas]
+        gas_props = db.GUEST_DB[gas]
         struct_props = db.STRUCTURE_DB[structure][cavity_type]
         reference_props = db.REFERENCE_PROPS[structure]
 
@@ -112,10 +112,12 @@ class JohnHolderModel:
         except Exception:
             C_star = 0.0
 
+        Q_star = 1.0
         Q_star = self._q_star_calculation(gas_props, struct_props, reference_props, Rc)
         # print(
         #     f"[C* & Q*] Langmuir constant for {gas} in {structure} {cavity_type}: {C_star} m³/J, Q*={Q_star}"
         # )
+        
         print(
             f"[C] Final Langmuir constant for {gas} in {structure} {cavity_type}: C = {C_star * Q_star} m³/J"
         )
@@ -188,7 +190,7 @@ class JohnHolderModel:
         heat_integral, _ = quad(heat_integrand, T0, T)
         vol_integral = (dV / (self.R * T)) * (P - self.database.P0)
 
-        rhs = dMu0 / (self.R * T0) - heat_integral + vol_integral + np.log(a_w + 1e-12)
+        rhs = dMu0 / (self.R * T0) - heat_integral + vol_integral - np.log(a_w + 1e-12)
 
         # rhs = dMu0 / (self.R * T0) + np.log(a_w + 1e-12)
 
