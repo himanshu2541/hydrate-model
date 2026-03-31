@@ -202,8 +202,8 @@ class Database:
         self.KIJ_DB: dict = {
             ('CO2', 'CO2'): 0.0,
             ('H2', 'H2'): 0.0,
-            ('CO2', 'H2'): 0.125,  # Crucial for accurate CO2-H2 mixture fugacity
-            ('H2', 'CO2'): 0.125,  # Keep it symmetric
+            ('CO2', 'H2'): -0.162,  # Crucial for accurate CO2-H2 mixture fugacity
+            ('H2', 'CO2'): -0.162,  # Keep it symmetric
             # Ensure your other interactions (like water) are defined
             ('CO2', 'H2O'): 0.1896, # Standard PR value for CO2-H2O
             ('H2', 'H2O'): 0.0      # H2/H2O interaction is negligible
