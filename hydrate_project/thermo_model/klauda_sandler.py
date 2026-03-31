@@ -109,7 +109,7 @@ class KlaudaSandlerModel:
         a, sigma, eps = self._get_combined_kihara(gas, structure)  # returns in SI units
 
         R1 = struct_props["shells"]["1"]["R"] * ANGSTROM  # convert to Angstroms
-        limit = R1 - a  # in Angstroms
+        limit = R1 - a  # in meters
 
         def integrand(r):
             w_total = 0.0
@@ -230,11 +230,11 @@ class KlaudaSandlerModel:
         if structure == "sI":
             Nw = 46.0
             a_sI = 11.835 + 2.217e-5 * T + 2.242e-6 * T**2
-            Vt = (a_sI) * 1e-30 * NA / Nw
+            Vt = (a_sI**3) * 1e-30 * NA / Nw
         else:  # sII
             Nw = 136.0
             a_sII = 17.13 + 2.249e-4 * T + 2.013e-6 * T**2 + 1.009e-9 * T**3
-            Vt = (a_sII) * 1e-30 * NA / Nw
+            Vt = (a_sII**3) * 1e-30 * NA / Nw
 
         Vc = -8.006e-9 * P_MPa + 5.448e-12 * P_MPa**2
         return Vt + Vc

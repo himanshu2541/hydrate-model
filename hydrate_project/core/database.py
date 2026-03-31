@@ -19,7 +19,7 @@ class Database:
             "N2":      {"sigma": 3.469,  "eps_k": 142.1,   "a": 0.341},
             "CO2":     {"sigma": 3.335,  "eps_k": 513.85,  "a": 0.677},
             # H2: not in K&S 2000; Tee et al. 1966 spherical-core values
-            "H2":      {"sigma": 2.958,  "eps_k": 37.0,    "a": 0.000},
+            "H2":      {"sigma": 2.958,  "eps_k": 31.7,    "a": 0.000},
             # Water (K&S Table 3)
             "H2O":     {"sigma": 3.564,  "eps_k": 102.134, "a": 0.000},
         }
@@ -68,8 +68,8 @@ class Database:
                 "is_linear": True,
             },
             "H2": {
-                "Tc": 33.19,
-                "Pc": 13.13e5,
+                "Tc": 43.6,
+                "Pc": 20.47e5,
                 "omega": -0.216,
                 "sigma": self.KS_KIHARA_PARAMS["H2"]["sigma"],
                 "eps_k": self.KS_KIHARA_PARAMS["H2"]["eps_k"],  # K
@@ -202,8 +202,8 @@ class Database:
         self.KIJ_DB: dict = {
             ('CO2', 'CO2'): 0.0,
             ('H2', 'H2'): 0.0,
-            ('CO2', 'H2'): -0.017,  # Crucial for accurate CO2-H2 mixture fugacity
-            ('H2', 'CO2'): -0.017,  # Keep it symmetric
+            ('CO2', 'H2'): 0.125,  # Crucial for accurate CO2-H2 mixture fugacity
+            ('H2', 'CO2'): 0.125,  # Keep it symmetric
             # Ensure your other interactions (like water) are defined
             ('CO2', 'H2O'): 0.1896, # Standard PR value for CO2-H2O
             ('H2', 'H2O'): 0.0      # H2/H2O interaction is negligible
@@ -241,36 +241,29 @@ class Database:
             "H2":  {"H1":  -86.8550, "H2":    4178.717,  "H3":    10.4935,  "H4":   0.00632},
         }
 
-        # ── Modified UNIFAC (Dahl, Fredenslund & Rasmussen 1991) ──────────────
+        # ── Modified UNIFAC (Dortmund) Groups ──────────────
         self.MOD_UNIFAC_GROUPS: dict = {
             1: {"name": "CH2", "R": 0.6744, "Q": 0.5400},
-            6: {"name": "H2O", "R": 0.9200, "Q": 1.4000},
+            7: {"name": "H2O", "R": 0.9200, "Q": 1.4000},  # Dortmund uses Group 7 for H2O
             13: {"name": "CH2O", "R": 0.9183, "Q": 0.7800},
-            22: {"name": "H2", "R": 0.8320, "Q": 1.1410},
-            26: {"name": "CO2", "R": 2.5920, "Q": 2.5220},
         }
 
         self.UNIFAC_MAPPING: dict = {
-            "CO2": {"unifac_groups": {26: 1}},
-            "H2": {"unifac_groups": {22: 1}},
-            "H2O": {"unifac_groups": {6: 1}},
+            "H2O": {"unifac_groups": {7: 1}},
             "DIOX": {"unifac_groups": {1: 4, 13: 2}},
         }
 
+        # [a, b, c] parameters for Dortmund temperature dependence
         self.MOD_UNIFAC_INTERACTIONS: dict = {
-            (6, 26): [226.6, -0.2410],
-            (26, 6): [1067.0, -0.4180],
-            (6, 22): [949.9, -0.3100],
-            (22, 6): [1586.0, 3.9240],
-            (6, 1): [0.0, 0.0],
-            (1, 6): [0.0, 0.0],
-            (6, 13): [0.0, 0.0],
-            (13, 6): [0.0, 0.0],
-            (22, 26): [0.0, 0.0],
-            (26, 22): [0.0, 0.0],
-            (6, 6): [0.0, 0.0],
-            (22, 22): [0.0, 0.0],
-            (26, 26): [0.0, 0.0],
+            # Alkane (1) & Water (7)
+            (7, 1): [318.0, -1.16, 0.0],
+            (1, 7): [2816.0, -11.96, 0.0],
+            # Alkane (1) & Ether (13)
+            (1, 13): [102.0, -0.2, 0.0],
+            (13, 1): [70.0, -0.1, 0.0],
+            # Ether (13) & Water (7)
+            (13, 7): [-150.0, 1.2, 0.0],
+            (7, 13): [250.0, -0.5, 0.0],
         }
 
     @property

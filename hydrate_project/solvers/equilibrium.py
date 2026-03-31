@@ -45,14 +45,7 @@ class EquilibriumSolver:
         try:
             unifac_pure = ModifiedUnifac({"H2O": 1.0}, self.database)
             x_gas_total = 0.0
-            mix_comps = {}
 
-            # Partial molar volumes at infinite dilution [m³/mol].
-            # These enter the Poynting correction for high-pressure solubility
-            # (Klauda & Sandler 2000, Eq. 19).
-            # CO2 : 32 mL/mol  (K&S 2000)
-            # H2  : 26.1 mL/mol (Brelvi & O'Connell 1972; ~40% larger than
-            #        the previously hard-coded 15 mL/mol)
             v_inf = {"CO2": 32.0e-6, "H2": 26.1e-6}
 
             for gas in list(f_dict.keys()):
@@ -62,21 +55,31 @@ class EquilibriumSolver:
                 )
                 x_gas = f_dict[gas] / (H_val_base * poynting_factor)
                 x_gas_total += x_gas
-                mix_comps[gas] = x_gas
 
+            # Calculate true mole fraction of water in the total liquid
             x_w = max(1.0 - x_gas_total - self.promoter_frac, 0.0)
-            mix_comps["H2O"] = x_w
 
-            if self.promoter_frac > 0 and self.promoter_name:
-                mix_comps[self.promoter_name] = self.promoter_frac
+            # Isolate the solvent (Water + Promoter) for UNIFAC
+            solvent_total = x_w + self.promoter_frac
+            unifac_comps = {}
+            if solvent_total > 0:
+                unifac_comps["H2O"] = x_w / solvent_total
+                if self.promoter_frac > 0 and self.promoter_name:
+                    unifac_comps[self.promoter_name] = (
+                        self.promoter_frac / solvent_total
+                    )
+            else:
+                unifac_comps["H2O"] = 1.0
 
-            unifac_mix = ModifiedUnifac(mix_comps, self.database)
+            # Calculate activity coefficient using ONLY the normalized solvent matrix
+            unifac_mix = ModifiedUnifac(unifac_comps, self.database)
             gamma_dict = unifac_mix.calc_gamma(T)
+
+            # The activity of water is the true mole fraction * activity coefficient
             aw_val = x_w * gamma_dict.get("H2O", 1.0)
 
-            # Promoter Fugacity via Clausius-Clapeyron vapor pressure
             if self.promoter_frac > 0 and self.promoter_name:
-                delta_H_vap = 35000.0  # J/mol
+                delta_H_vap = 35000.0
                 P_sat = 9300.0 * np.exp(
                     (delta_H_vap / self.database.R) * (1 / 293.15 - 1 / T)
                 )
