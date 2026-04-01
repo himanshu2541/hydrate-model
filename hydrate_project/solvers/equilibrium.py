@@ -222,7 +222,7 @@ class EquilibriumSolver:
                 )
             elif method == "bisect":
                 sol = root_scalar(
-                    objective, bracket=[1e5, 50e6], method="bisect", xtol=1.0
+                    objective, bracket=[1e5, 100e6], method="bisect", xtol=1.0
                 )
             else:
                 raise ValueError(f"Unknown solver method: {method}")

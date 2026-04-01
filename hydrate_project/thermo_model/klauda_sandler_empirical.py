@@ -20,118 +20,30 @@ Solver objective (compatible with existing EquilibriumSolver interface):
 """
 
 import numpy as np
-from scipy.integrate import quad
 
 
-class KlaudaSandlerModel:
+class KlaudaSandlerEmpiricalModel:
 
     def __init__(self, database):
         self.database = database
         self.R = database.R
-        self.kihara_params = {}
-
-    def _get_combined_kihara(self, gas, structure):
-        """
-        Lorentz-Berthelot combining rules (K&S Eq. 13):
-          σ = (σ_g + σ_w) / 2
-          ε = sqrt(ε_g · ε_w)
-          a = (a_g + a_w) / 2
-        Uses KS_KIHARA_PARAMS (Tee et al. 1966) — NOT the fitted GAS_DB values.
-        """
-        ANGSTROM = 1e-10
-        db = self.database
-
-        if str(gas + structure) not in self.kihara_params:
-            # Guest: from the K&S-specific Tee et al. table
-            ks = db.KS_KIHARA_PARAMS
-            gp = ks.get(gas, db.GUEST_DB[gas])  # fall back to GAS_DB if missing
-            wp = ks["H2O"]
-
-            a_g = gp["a"] * ANGSTROM
-            s_g = gp["sigma"] * ANGSTROM
-            e_g = gp["eps_k"] * db.KB
-
-            a_w = wp["a"] * ANGSTROM
-            s_w = wp["sigma"] * ANGSTROM
-            e_w = wp["eps_k"] * db.KB
-
-            a = (a_g + a_w) / 2.0
-            sigma = (s_g + s_w) / 2.0
-            eps = np.sqrt(e_g * e_w)
-            print(
-                f"Combined Kihara params for {gas} in {structure}: a={a} m, σ={sigma} m, ε={eps} J"
-            )
-            self.kihara_params[str(gas + structure)] = (a, sigma, eps)
-            return a, sigma, eps
-        else:
-            return self.kihara_params[str(gas + structure)]
-
-    # ── Kihara cell potential ──────────────────────────────────────────────
-
-    def _kihara_shell_potential(self, r, sigma, eps, a, R_shell, z):
-        """
-        Spherically-averaged Kihara cell potential for one shell.
-        K&S Eqs. 6-7.  Returns potential in Joules.
-        """
-        if r >= (R_shell - a):
-            print(f"Warning: r={r} m exceeds shell radius minus core (R_shell - a = {R_shell - a} m). Returning large potential.")
-            return 1e50
-
-        def delta(N):
-            x = r / R_shell
-            y = a / R_shell
-            return (1.0 / N) * ((1 - x - y) ** (-N) - (1 + x - y) ** (-N))
-
-        s12 = sigma**12
-        s6 = sigma**6
-        term_rep = (s12 / (R_shell**11 * r)) * (
-            delta(10) + (a / R_shell) * delta(11)
-        )  # unitless
-        term_att = (s6 / (R_shell**5 * r)) * (
-            delta(4) + (a / R_shell) * delta(5)
-        )  # unitless
-
-        w_r = 2 * z * eps * (term_rep - term_att)  # in Joules
-        return w_r
 
     # ── Langmuir constant ─────────────────────────────────────────────────
 
     def calc_langmuir_constant(self, T, gas, cavity_type, structure):
         """
-        K&S Eq. 4 with multi-shell W(r) from Eq. 12.
-        Shells 2 & 3: evaluated at r = 0 (flat over integration range).
         Returns C in m³/J.
         """
         db = self.database
-        ANGSTROM = 1e-10
-        struct_props = db.STRUCTURE_DB[structure][cavity_type]
-        a, sigma, eps = self._get_combined_kihara(gas, structure)  # returns in SI units
 
-        R1 = struct_props["shells"]["1"]["R"] * ANGSTROM  # convert to meters
-        limit = R1 - a  # in meters
+        # formula Cml(T) = exp(Aml + Bml/T + Dml/T²) 
+        params = db.KS_EMP_LANGMUIR_PARAMS[structure][cavity_type].get(gas)
+        if params is None:
+            raise ValueError(f"Langmuir parameters for {gas} not found in {structure} {cavity_type}")
 
-        def integrand(r):
-            w_total = 0.0
-            for shell in struct_props["shells"].values():
-                R_sh = shell["R"] * ANGSTROM  # convert to meters
-                z_sh = shell["z"]
-                w_total += self._kihara_shell_potential(
-                    r, sigma, eps, a, R_sh, z_sh
-                )  # in Joules
-
-            if w_total > 100 * db.KB * T:
-                return 0.0
-            return np.exp(-w_total / (db.KB * T)) * r * r
-
-        try:
-            integral, _ = quad(integrand, 1e-12, limit)
-            C = (4 * np.pi / (db.KB * T)) * integral  # in m³/J
-        except Exception:
-            C = 0.0
-
-        # print(
-        #     f"[C] Calculated Langmuir constant for {gas} in {structure} with {cavity_type}: C = {C}"
-        # )
+        A, B, D = params["A"], params["B"], params["D"]
+        C = np.exp(A + B / T + D / (T ** 2))
+        print(f"Calculated Langmuir constant for {gas} in {structure} {cavity_type} at T={T} K: {C}")
         return C
 
     def calc_cage_occupancy(self, T, fugacities, structure, cavity_type):
@@ -167,6 +79,7 @@ class KlaudaSandlerModel:
         phase = "ice" if T < self.database.T0 else "liquid"
         p = self.database.WATER_VP_PARAMS[phase]
         ln_psat = p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
+
         return ln_psat
 
     def _mixture_vp_params(self, T, fugacities, structure):
@@ -174,7 +87,7 @@ class KlaudaSandlerModel:
         Hydrate-occupancy weighted average of K&S Table 6 parameters.
         (K&S 2003 mixing rule for mixtures).
         """
-        vp_db = self.database.KS_VAPOR_PRESSURE_PARAMS[structure]
+        vp_db = self.database.KS_EMP_VAPOR_PRESSURE_PARAMS[structure]
 
         # Optimization: if pure gas, skip occupancy math
         if len(fugacities) == 1:
@@ -215,6 +128,7 @@ class KlaudaSandlerModel:
         """ln(P_sat^β [Pa]) using mixture-averaged QL1 parameters."""
         p = self._mixture_vp_params(T, fugacities, structure)
         ln_psat = p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
+        print(f"Calculated empty hydrate vapor pressure at T={T} K for {structure} with fugacities {fugacities}: ln(P_sat^β) = {ln_psat}")
         return ln_psat
 
     # ── Molar volumes ──────────────────────────────────────────────────────
