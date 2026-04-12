@@ -35,16 +35,12 @@ from hydrate_project.utils.properties_window import PropertiesWindow
 
 PRESET_DATA: dict[str, dict] = {
     "CO₂/H₂ (39.2/60.8 mol%) — Kumar et al. 2006  [sI, bulk water]": {
-        "T (K)": [273.9, 274.8, 275.7, 276.5, 277.3, 278.0, 278.4],
-        "P_eq (MPa)": [5.56, 6.15, 6.90, 7.75, 8.80, 9.95, 10.74],
+        "T (K)": [273.9, 274.6, 275.1, 275.6, 276.0, 276.4, 276.7, 277.5, 277.7, 278.4],
+        "P_eq (MPa)": [5.56, 6.04, 6.41, 6.84, 7.16, 7.56, 7.95, 9.15, 9.42, 10.74],
     },
     "CO₂/H₂ (57.9/42.1 mol%) — Kumar et al. 2006  [sI, bulk water]": {
-        "T (K)": [274.6, 275.5, 276.5, 277.5, 278.5, 279.5, 280.5, 281.4],
-        "P_eq (MPa)": [2.77, 3.20, 3.80, 4.55, 5.45, 6.55, 7.90, 8.21],
-    },
-    "CO₂/H₂ (39.9/60.1 mol%) — Belandria et al. 2011  [sI, bulk water]": {
-        "T (K)": [273.6, 274.5, 275.4, 276.4, 277.3, 278.3, 279.3, 280.3, 281.2],
-        "P_eq (MPa)": [1.88, 2.20, 2.60, 3.10, 3.70, 4.50, 5.50, 6.70, 8.57],
+        "T (K)": [274.6, 277.8, 279.4, 280.7, 281.4],
+        "P_eq (MPa)": [2.77, 4.61, 5.99, 7.41, 8.31],
     },
     "CO₂ (Pure) — Sloan & Koh 2008  [sI, bulk water]": {
         "T (K)": [
@@ -108,9 +104,10 @@ def _run_model(
     """Run solver for every selected EOS.  Returns (results_dict, error)."""
     try:
         from hydrate_project.core.database import Database
-        # from hydrate_project.thermo_model.john_holder import JohnHolderModel
-        # from hydrate_project.thermo_model.klauda_sandler import KlaudaSandlerModel
-        from hydrate_project.thermo_model.klauda_sandler_empirical import KlaudaSandlerEmpiricalModel
+        from hydrate_project.thermo_model.klauda_sandler import KlaudaSandlerModel
+        from hydrate_project.thermo_model.klauda_sandler_empirical import (
+            KlaudaSandlerEmpiricalModel,
+        )
         from hydrate_project.eos_model.pr_eos import PREOS
         from hydrate_project.eos_model.srk_eos import SRKEOS
         from hydrate_project.eos_model.pt_eos import PTEOS
@@ -123,9 +120,22 @@ def _run_model(
         }
 
         db = Database()
-        # hydrate_core = KlaudaSandlerModel(database=db)
-        hydrate_core = KlaudaSandlerEmpiricalModel(database=db)
-        # hydrate_core = JohnHolderModel(database=db)
+
+        active_gases = {g: f for g, f in gas_comp.items() if f > 1e-6}
+        has_promoter = any(k != "H2O" for k, v in liq_comp.items() if v > 1e-6)
+        
+        if has_promoter:
+            # Promoters require Kihara integration to calculate cavity occupancy
+            hydrate_core = KlaudaSandlerModel(database=db)
+            print("Detected Promoter -> Using standard KlaudaSandlerModel")
+        elif len(active_gases) == 1 and "CO2" in active_gases:
+            # Pure CO2 uses the standard Kihara model
+            hydrate_core = KlaudaSandlerModel(database=db)
+            print("Detected Pure CO2 -> Using standard KlaudaSandlerModel")
+        else:
+            # Gas mixtures (without promoters) use the empirical correlations
+            hydrate_core = KlaudaSandlerEmpiricalModel(database=db)
+            print("Detected Gas Mixture -> Using KlaudaSandlerEmpiricalModel")
         results: dict[str, pd.DataFrame] = {}
 
         for eos_name in eos_names:

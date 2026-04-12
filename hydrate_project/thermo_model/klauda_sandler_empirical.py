@@ -60,17 +60,28 @@ class KlaudaSandlerEmpiricalModel:
     def _delta_mu_hydrate_over_RT(self, T, fugacities, structure):
         """
         Δμ_w^H / RT  = −sum_m ν_m · ln(1 − sum_j θ_mj)
-        K&S Eq. 2.  Returns the *positive* value.
+        Mathematically exact form: sum_m ν_m · ln(1 + sum_j C_mj f_j)
         """
         sp = self.database.STRUCTURE_DB[structure]
-        occ_s = self.calc_cage_occupancy(T, fugacities, structure, "small")
-        occ_l = self.calc_cage_occupancy(T, fugacities, structure, "large")
-        # print(
-        #     f"Calculated cage occupancies for Δμ_w^H at T={T} K in {structure}: small={occ_s}, large={occ_l}"
-        # )
-        ts = max(1.0 - sum(occ_s.values()), 1e-15)
-        tl = max(1.0 - sum(occ_l.values()), 1e-15)
-        return -(sp["small"]["nu"] * np.log(ts) + sp["large"]["nu"] * np.log(tl))
+
+        # Small cavity
+        C_s = {
+            g: self.calc_langmuir_constant(T, g, "small", structure) for g in fugacities
+        }
+        sum_Cf_s = sum(C_s[g] * f for g, f in fugacities.items())
+
+        # Large cavity
+        C_l = {
+            g: self.calc_langmuir_constant(T, g, "large", structure) for g in fugacities
+        }
+        sum_Cf_l = sum(C_l[g] * f for g, f in fugacities.items())
+
+        # Exact logarithmic calculation to prevent float64 precision loss
+        # np.log1p(x) calculates ln(1 + x) exactly, even for massive numbers
+        ln_unocc_s = -np.log1p(sum_Cf_s)
+        ln_unocc_l = -np.log1p(sum_Cf_l)
+
+        return -(sp["small"]["nu"] * ln_unocc_s + sp["large"]["nu"] * ln_unocc_l)
 
     # ── Vapor pressure helpers (QL1 form, K&S Eq. 23) ─────────────────────
 
@@ -128,7 +139,7 @@ class KlaudaSandlerEmpiricalModel:
         """ln(P_sat^β [Pa]) using mixture-averaged QL1 parameters."""
         p = self._mixture_vp_params(T, fugacities, structure)
         ln_psat = p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
-        print(f"Calculated empty hydrate vapor pressure at T={T} K for {structure} with fugacities {fugacities}: ln(P_sat^β) = {ln_psat}")
+        # print(f"Calculated empty hydrate vapor pressure at T={T} K for {structure} with fugacities {fugacities}: ln(P_sat^β) = {ln_psat}")
         return ln_psat
 
     # ── Molar volumes ──────────────────────────────────────────────────────

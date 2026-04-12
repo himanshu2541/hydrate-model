@@ -78,10 +78,11 @@ class EquilibriumSolver:
             # The activity of water is the true mole fraction * activity coefficient
             aw_val = x_w * gamma_dict.get("H2O", 1.0)
 
+            promoter_data = self.database.GUEST_DB.get(self.promoter_name, {})
             if self.promoter_frac > 0 and self.promoter_name:
-                delta_H_vap = 35000.0
-                P_sat = 9300.0 * np.exp(
-                    (delta_H_vap / self.database.R) * (1 / 293.15 - 1 / T)
+                delta_H_vap = promoter_data.get("delta_H_vap", 34700.0)
+                P_sat = promoter_data.get("P_sat_ref", 9300.0) * np.exp(
+                    (delta_H_vap / self.database.R) * (1 / promoter_data.get("T_sat_ref", 293.15) - 1 / T)
                 )
                 f_dict[self.promoter_name] = (
                     self.promoter_frac * gamma_dict.get(self.promoter_name, 1.0) * P_sat
@@ -222,7 +223,7 @@ class EquilibriumSolver:
                 )
             elif method == "bisect":
                 sol = root_scalar(
-                    objective, bracket=[1e5, 100e6], method="bisect", xtol=1.0
+                    objective, bracket=[1, 100e6], method="bisect", xtol=1.0
                 )
             else:
                 raise ValueError(f"Unknown solver method: {method}")

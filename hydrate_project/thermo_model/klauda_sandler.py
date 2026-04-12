@@ -74,7 +74,9 @@ class KlaudaSandlerModel:
         K&S Eqs. 6-7.  Returns potential in Joules.
         """
         if r >= (R_shell - a):
-            print(f"Warning: r={r} m exceeds shell radius minus core (R_shell - a = {R_shell - a} m). Returning large potential.")
+            print(
+                f"Warning: r={r} m exceeds shell radius minus core (R_shell - a = {R_shell - a} m). Returning large potential."
+            )
             return 1e50
 
         def delta(N):
@@ -102,6 +104,12 @@ class KlaudaSandlerModel:
         Shells 2 & 3: evaluated at r = 0 (flat over integration range).
         Returns C in m³/J.
         """
+        # Large liquid promoters (DIOX, THF, CP) physically cannot fit inside the 
+        # squashed sI large cavity. We must bypass the Kihara spherical illusion.
+        sII_only_promoters = ["DIOX", "THF", "CP", "C5H10"] 
+        if structure == "sI" and gas in sII_only_promoters:
+            return 0.0
+
         db = self.database
         ANGSTROM = 1e-10
         struct_props = db.STRUCTURE_DB[structure][cavity_type]
@@ -119,8 +127,6 @@ class KlaudaSandlerModel:
                     r, sigma, eps, a, R_sh, z_sh
                 )  # in Joules
 
-            if w_total > 100 * db.KB * T:
-                return 0.0
             return np.exp(-w_total / (db.KB * T)) * r * r
 
         try:
@@ -129,9 +135,9 @@ class KlaudaSandlerModel:
         except Exception:
             C = 0.0
 
-        # print(
-        #     f"[C] Calculated Langmuir constant for {gas} in {structure} with {cavity_type}: C = {C}"
-        # )
+        print(
+            f"[C] Calculated Langmuir constant for {gas} in {structure} with {cavity_type}: C = {C}"
+        )
         return C
 
     def calc_cage_occupancy(self, T, fugacities, structure, cavity_type):
@@ -148,17 +154,28 @@ class KlaudaSandlerModel:
     def _delta_mu_hydrate_over_RT(self, T, fugacities, structure):
         """
         Δμ_w^H / RT  = −sum_m ν_m · ln(1 − sum_j θ_mj)
-        K&S Eq. 2.  Returns the *positive* value.
+        Mathematically exact form: sum_m ν_m · ln(1 + sum_j C_mj f_j)
         """
         sp = self.database.STRUCTURE_DB[structure]
-        occ_s = self.calc_cage_occupancy(T, fugacities, structure, "small")
-        occ_l = self.calc_cage_occupancy(T, fugacities, structure, "large")
-        # print(
-        #     f"Calculated cage occupancies for Δμ_w^H at T={T} K in {structure}: small={occ_s}, large={occ_l}"
-        # )
-        ts = max(1.0 - sum(occ_s.values()), 1e-15)
-        tl = max(1.0 - sum(occ_l.values()), 1e-15)
-        return -(sp["small"]["nu"] * np.log(ts) + sp["large"]["nu"] * np.log(tl))
+
+        # Small cavity
+        C_s = {
+            g: self.calc_langmuir_constant(T, g, "small", structure) for g in fugacities
+        }
+        sum_Cf_s = sum(C_s[g] * f for g, f in fugacities.items())
+
+        # Large cavity
+        C_l = {
+            g: self.calc_langmuir_constant(T, g, "large", structure) for g in fugacities
+        }
+        sum_Cf_l = sum(C_l[g] * f for g, f in fugacities.items())
+
+        # Exact logarithmic calculation to prevent float64 precision loss
+        # np.log1p(x) calculates ln(1 + x) exactly, even for massive numbers
+        ln_unocc_s = -np.log1p(sum_Cf_s)
+        ln_unocc_l = -np.log1p(sum_Cf_l)
+
+        return -(sp["small"]["nu"] * ln_unocc_s + sp["large"]["nu"] * ln_unocc_l)
 
     # ── Vapor pressure helpers (QL1 form, K&S Eq. 23) ─────────────────────
 
@@ -176,12 +193,19 @@ class KlaudaSandlerModel:
         """
         vp_db = self.database.KS_VAPOR_PRESSURE_PARAMS[structure]
 
+        sII_promoters = ["DIOX", "THF", "CP", "C5H10"]
+        heavy_fallback = "C3H8" if "C3H8" in vp_db else next(iter(vp_db.keys()))
+        
+        for gas in fugacities:
+            if gas in sII_promoters and structure == "sII":
+                # Bypass the mixing rule completely. The lattice belongs to the promoter.
+                return vp_db[heavy_fallback]
+
         # Optimization: if pure gas, skip occupancy math
         if len(fugacities) == 1:
             gas = next(iter(fugacities))
             return vp_db.get(gas, next(iter(vp_db.values())))
 
-        # Calculate actual hydrate occupancies for mixing weights
         occ_s = self.calc_cage_occupancy(T, fugacities, structure, "small")
         occ_l = self.calc_cage_occupancy(T, fugacities, structure, "large")
 
@@ -201,9 +225,20 @@ class KlaudaSandlerModel:
             return vp_db.get(gas, next(iter(vp_db.values())))
 
         A = B = C = D = 0.0
+        
+        # Determine a stable fallback for unparameterized heavy promoters
+        # Propane (C3H8) is the standard reference sII former in K&S tables.
+        heavy_fallback = "C3H8" if "C3H8" in vp_db else next(iter(vp_db.keys()))
+
         for gas in fugacities.keys():
             w = hydrate_moles[gas] / total_moles  # Hydrate-free basis fraction
-            p = vp_db.get(gas, next(iter(vp_db.values())))
+            
+            if gas not in vp_db and gas not in self.database.GUEST_DB:
+                # If it's a liquid promoter not in the K&S gas table, use heavy fallback
+                p = vp_db[heavy_fallback]
+            else:
+                p = vp_db.get(gas, vp_db[heavy_fallback])
+                
             A += w * p["A"]
             B += w * p["B"]
             C += w * p["C"]
@@ -215,6 +250,7 @@ class KlaudaSandlerModel:
         """ln(P_sat^β [Pa]) using mixture-averaged QL1 parameters."""
         p = self._mixture_vp_params(T, fugacities, structure)
         ln_psat = p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
+        print(f"Calculated empty hydrate vapor pressure at T={T} K for {structure} with fugacities {fugacities}: ln(P_sat^β) = {ln_psat}")
         return ln_psat
 
     # ── Molar volumes ──────────────────────────────────────────────────────
