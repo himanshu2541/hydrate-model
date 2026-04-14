@@ -123,23 +123,28 @@ class EquilibriumSolver:
         nu_small = self.database.STRUCTURE_DB[structure]["small"]["nu"]
         nu_large = self.database.STRUCTURE_DB[structure]["large"]["nu"]
 
+        all_guests = list(self.eos.gases)
+        if self.promoter_name and self.promoter_name not in all_guests:
+            all_guests.append(self.promoter_name)
+
         hydrate_moles = {}
         total_hydrate_moles = 0.0
-        for gas in self.eos.gases:
-            moles = nu_small * occ_small.get(gas, 0) + nu_large * occ_large.get(gas, 0)
-            hydrate_moles[gas] = moles
+        
+        # Iterate over all guests (including DIOX) to find the correct hydrate fractions
+        for guest in all_guests:
+            moles = nu_small * occ_small.get(guest, 0) + nu_large * occ_large.get(guest, 0)
+            hydrate_moles[guest] = moles
             total_hydrate_moles += moles
 
         z_hydrate = {
-            gas: (
-                hydrate_moles[gas] / total_hydrate_moles
+            guest: (
+                hydrate_moles[guest] / total_hydrate_moles
                 if total_hydrate_moles > 0
                 else 0.0
             )
-            for gas in self.eos.gases
+            for guest in all_guests
         }
 
-        # FIX: look up phi by gas name instead of hardcoding index 0 for CO2
         phi_by_gas = {gas: phi_val[i] for i, gas in enumerate(self.eos.gases)}
 
         try:
@@ -156,13 +161,16 @@ class EquilibriumSolver:
             "Delta_Mu_H": mu_h,
         }
 
-        # Dynamically store fugacity and phi for each gas
-        for gas in self.eos.gases:
-            state[f"f_{gas} (MPa)"] = f_dict.get(gas, 0) / 1e6
-            state[f"Phi_{gas}"] = phi_by_gas.get(gas, 1.0)
-            state[f"Theta_Small_{gas}"] = occ_small.get(gas, 0)
-            state[f"Theta_Large_{gas}"] = occ_large.get(gas, 0)
-            state[f"z_Hyd_{gas}"] = z_hydrate[gas]
+        for guest in all_guests:
+            state[f"f_{guest} (MPa)"] = f_dict.get(guest, 0) / 1e6
+            
+            # Fugacity coefficients (Phi) are only tracked for EOS gases. 
+            # We set NaN for liquid promoters like DIOX.
+            state[f"Phi_{guest}"] = phi_by_gas.get(guest, "nan")
+            
+            state[f"Theta_Small_{guest}"] = occ_small.get(guest, 0)
+            state[f"Theta_Large_{guest}"] = occ_large.get(guest, 0)
+            state[f"z_Hyd_{guest}"] = z_hydrate.get(guest, 0)
 
         # Calculate Ideal Separation Factor (Enrichment Ratio)
         if len(self.eos.gases) >= 2:
@@ -175,7 +183,7 @@ class EquilibriumSolver:
                 # Defined as: y_gas_hydrate / y_gas_vapor
                 state[f"SF_{gas1}_{gas2}"] = z_hydrate[gas1] / y1
             else:
-                state[f"SF_{gas1}_{gas2}"] = np.nan
+                state[f"SF_{gas1}_{gas2}"] = "nan"
 
         # Optional: Track the ideal separation factor for EVERY gas individually
         for i, gas in enumerate(self.eos.gases):
@@ -183,7 +191,7 @@ class EquilibriumSolver:
             if y_gas > 0:
                 state[f"Ideal_SF_{gas}"] = z_hydrate[gas] / y_gas
             else:
-                state[f"Ideal_SF_{gas}"] = np.nan
+                state[f"Ideal_SF_{gas}"] = "nan"
 
         return state
 
@@ -231,7 +239,8 @@ class EquilibriumSolver:
             if sol.converged:
                 return self._calculate_state(T, sol.root, structure)
             return None
-        except Exception:
+        except Exception as e:
+            print(f"Solver crashed at {T} K: {repr(e)}") 
             return None
 
     def find_optimum_structure(
