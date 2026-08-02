@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hydrate Equilibrium Model</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-top">
+    <h1>&#128300; Hydrate Equilibrium Model</h1>
+    <div class="project-bar" data-testid="project-bar">
+      <label class="field-label">Project
+        <select data-testid="project-select"></select>
+      </label>
+      <button type="button" data-testid="project-new">+ New</button>
+      <button type="button" data-testid="project-save">&#128190; Save</button>
+      <button type="button" data-testid="project-rename">Rename</button>
+      <button type="button" class="danger-btn" data-testid="project-delete">Delete</button>
+    </div>
+  </div>
+  <nav class="tabs main-nav" data-testid="main-nav">
+    <button type="button" class="tab active" data-testid="nav-setup" data-page="setup">Setup</button>
+    <button type="button" class="tab" data-testid="nav-plot" data-page="plot">Plot Builder</button>
+    <button type="button" class="tab" data-testid="nav-comparison" data-page="comparison">Comparison</button>
+    <button type="button" class="tab" data-testid="nav-console" data-page="console">Console</button>
+  </nav>
+</header>
+
+<main class="pages">
+
+  <!-- ── Setup page ────────────────────────────────────────────────────── -->
+  <section class="page" data-testid="page-setup">
+    <div class="setup-grid">
+
+      <fieldset class="panel" data-testid="panel-gas">
+        <legend>Gas Phase Composition</legend>
+        <div data-testid="gas-rows" class="rows"></div>
+        <div class="row-actions">
+          <button type="button" data-testid="gas-add-row">+ Add gas</button>
+          <span data-testid="gas-sum" class="sum-label">Sum: —</span>
+        </div>
+      </fieldset>
+
+      <fieldset class="panel" data-testid="panel-liquid">
+        <legend>Liquid Phase Composition</legend>
+        <div class="liq-display" data-testid="liquid-display">H&#8322;O: 1.0000</div>
+        <label class="field-label">Promoter
+          <select data-testid="liquid-promoter"><option value="none">None</option></select>
+        </label>
+        <div data-testid="liquid-frac-row" class="field-row" hidden>
+          <label class="field-label">Mol fraction
+            <input type="text" data-testid="liquid-frac" value="0.0556">
+          </label>
+          <span class="hint" data-testid="liquid-hint"></span>
+        </div>
+      </fieldset>
+
+      <fieldset class="panel" data-testid="panel-temperature">
+        <legend>Temperature Scan Range</legend>
+        <div class="field-row">
+          <label class="field-label">From (K)<input type="text" data-testid="temp-min" value="273.15"></label>
+          <label class="field-label">To (K)<input type="text" data-testid="temp-max" value="283.15"></label>
+          <label class="field-label">Step (K)<input type="text" data-testid="temp-step" value="0.5"></label>
+        </div>
+        <div class="hint" data-testid="temp-preview"></div>
+      </fieldset>
+
+      <fieldset class="panel" data-testid="panel-eos">
+        <legend>Equation of State Models</legend>
+        <div data-testid="eos-checkboxes" class="checkbox-row"></div>
+      </fieldset>
+
+      <fieldset class="panel" data-testid="panel-expdata">
+        <legend>Experimental Data (optional &mdash; for AAD)</legend>
+        <div class="radio-row" data-testid="expdata-mode">
+          <label><input type="radio" name="expdata-mode" value="none" checked> None</label>
+          <label><input type="radio" name="expdata-mode" value="preset"> From literature</label>
+          <label><input type="radio" name="expdata-mode" value="custom"> Enter manually</label>
+        </div>
+        <div data-testid="expdata-preset-row" class="field-row" hidden>
+          <label class="field-label">Dataset
+            <select data-testid="expdata-preset"></select>
+          </label>
+        </div>
+        <div data-testid="expdata-custom-row" hidden>
+          <p class="hint">One T(K), P(MPa) pair per line (comma or space separated):</p>
+          <textarea data-testid="expdata-custom" rows="4"># T(K)   P(MPa)
+273.9   5.56
+275.7   6.90</textarea>
+        </div>
+      </fieldset>
+
+    </div>
+
+    <button type="button" class="primary-btn run-btn" data-testid="run-button">&#9654; Run Calculation</button>
+    <div class="hint" data-testid="run-status">Ready.</div>
+  </section>
+
+  <!-- ── Plot Builder page ────────────────────────────────────────────────── -->
+  <section class="page" data-testid="page-plot" hidden>
+    <nav class="tabs">
+      <button type="button" class="tab active" data-testid="tab-plot" data-tab="plot">Plot Builder</button>
+      <button type="button" class="tab" data-testid="tab-properties" data-tab="properties">Properties Table</button>
+    </nav>
+
+    <div class="view" data-testid="view-plot">
+      <aside class="plot-sidebar" data-testid="plot-sidebar">
+        <label class="field-label">X Axis
+          <select data-testid="plot-xvar"></select>
+        </label>
+
+        <label class="field-label">Row Variables (Y-left)</label>
+        <p class="hint">Ctrl/Cmd+click to select multiple</p>
+        <select multiple data-testid="plot-rowvars" size="6"></select>
+
+        <label class="field-label">Col Variables (Y panels)</label>
+        <p class="hint">Each selection = one column of subplots</p>
+        <select multiple data-testid="plot-colvars" size="6"></select>
+
+        <label class="field-label">Comparison Mode</label>
+        <div class="radio-row-vert" data-testid="plot-comparison">
+          <label><input type="radio" name="plot-comparison" value="eos" checked> <span data-testid="plot-comparison-eos-label">Overlay all</span></label>
+          <label><input type="radio" name="plot-comparison" value="single"> <span data-testid="plot-comparison-single-label">Single</span></label>
+        </div>
+
+        <label class="field-label">Options</label>
+        <label><input type="checkbox" data-testid="plot-exp-overlay" checked> Show experimental data</label>
+        <label><input type="checkbox" data-testid="plot-dark-mode"> Dark plot background</label>
+
+        <button type="button" class="primary-btn" data-testid="plot-update">&#9654; Update Plot</button>
+        <button type="button" data-testid="plot-save-png">&#128190; Save PNG</button>
+      </aside>
+      <div class="plot-canvas-wrap">
+        <div id="plot-canvas" data-testid="plot-canvas"></div>
+      </div>
+    </div>
+
+    <div class="view" data-testid="view-properties" hidden>
+      <div class="field-row">
+        <label class="field-label">EOS model
+          <select data-testid="props-eos"></select>
+        </label>
+        <label class="field-label">Filter T from<input type="text" data-testid="props-tmin"></label>
+        <label class="field-label">to<input type="text" data-testid="props-tmax"></label>
+        <button type="button" data-testid="props-apply">Apply</button>
+        <button type="button" data-testid="props-clear">Clear filter</button>
+      </div>
+      <div class="summary-cards" data-testid="props-summary"></div>
+      <div class="table-wrap">
+        <table data-testid="props-table">
+          <thead><tr></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="field-row">
+        <span class="hint" data-testid="props-rowlabel"></span>
+        <button type="button" data-testid="props-copy">&#128203; Copy to clipboard</button>
+        <button type="button" class="primary-btn" data-testid="props-export">&#128190; Export CSV</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Comparison page ──────────────────────────────────────────────────── -->
+  <section class="page" data-testid="page-comparison" hidden>
+    <fieldset class="panel" data-testid="panel-sweep">
+      <legend>Composition Comparison</legend>
+      <div class="radio-row" data-testid="sweep-axis">
+        <label><input type="radio" name="sweep-axis" value="diox" checked> Vary DIOX %</label>
+        <label><input type="radio" name="sweep-axis" value="gas_ratio"> Vary gas ratio</label>
+      </div>
+      <div data-testid="sweep-diox-row">
+        <label class="field-label">Promoter
+          <select data-testid="sweep-promoter"></select>
+        </label>
+        <label class="field-label">Mol % values
+          <input type="text" data-testid="sweep-diox-values" value="2, 5.56, 8, 10">
+        </label>
+      </div>
+      <div data-testid="sweep-ratio-row" hidden>
+        <p class="hint">One gas composition per line, e.g. CO2=0.4, H2=0.6</p>
+        <textarea data-testid="sweep-ratio-text" rows="4">CO2=0.392, H2=0.608
+CO2=0.579, H2=0.421</textarea>
+      </div>
+      <div class="field-row">
+        <label class="field-label">EOS
+          <select data-testid="sweep-eos"></select>
+        </label>
+        <button type="button" class="primary-btn" data-testid="sweep-run">&#9654; Run Comparison</button>
+      </div>
+      <div class="hint" data-testid="sweep-status"></div>
+    </fieldset>
+
+    <nav class="tabs">
+      <button type="button" class="tab active" data-testid="cmp-tab-plot" data-tab="plot">Plot</button>
+      <button type="button" class="tab" data-testid="cmp-tab-properties" data-tab="properties">Properties Table</button>
+    </nav>
+
+    <div class="view" data-testid="cmp-view-plot">
+      <aside class="plot-sidebar" data-testid="cmp-plot-sidebar">
+        <label class="field-label">X Axis
+          <select data-testid="plot-xvar"></select>
+        </label>
+
+        <label class="field-label">Row Variables (Y-left)</label>
+        <p class="hint">Ctrl/Cmd+click to select multiple</p>
+        <select multiple data-testid="plot-rowvars" size="6"></select>
+
+        <label class="field-label">Col Variables (Y panels)</label>
+        <p class="hint">Each selection = one column of subplots -- pick any numeric column (separation factor, P_eq, Delta_Mu, dH_diss, ...)</p>
+        <select multiple data-testid="plot-colvars" size="6"></select>
+
+        <label class="field-label">Comparison Mode</label>
+        <div class="radio-row-vert" data-testid="plot-comparison">
+          <label><input type="radio" name="cmp-plot-comparison" value="eos" checked> <span data-testid="plot-comparison-eos-label">Overlay all</span></label>
+          <label><input type="radio" name="cmp-plot-comparison" value="single"> <span data-testid="plot-comparison-single-label">Single</span></label>
+        </div>
+
+        <label class="field-label">Options</label>
+        <label><input type="checkbox" data-testid="plot-exp-overlay"> Show experimental data</label>
+        <label><input type="checkbox" data-testid="plot-dark-mode"> Dark plot background</label>
+
+        <button type="button" class="primary-btn" data-testid="plot-update">&#9654; Update Plot</button>
+        <button type="button" data-testid="plot-save-png">&#128190; Save PNG</button>
+      </aside>
+      <div class="plot-canvas-wrap">
+        <div id="cmp-plot-canvas" data-testid="cmp-plot-canvas"></div>
+      </div>
+    </div>
+
+    <div class="view" data-testid="cmp-view-properties" hidden>
+      <div class="field-row">
+        <label class="field-label">Series
+          <select data-testid="props-eos"></select>
+        </label>
+        <label class="field-label">Filter T from<input type="text" data-testid="props-tmin"></label>
+        <label class="field-label">to<input type="text" data-testid="props-tmax"></label>
+        <button type="button" data-testid="props-apply">Apply</button>
+        <button type="button" data-testid="props-clear">Clear filter</button>
+      </div>
+      <div class="summary-cards" data-testid="props-summary"></div>
+      <div class="table-wrap">
+        <table data-testid="props-table">
+          <thead><tr></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="field-row">
+        <span class="hint" data-testid="props-rowlabel"></span>
+        <button type="button" data-testid="props-copy">&#128203; Copy to clipboard</button>
+        <button type="button" class="primary-btn" data-testid="props-export">&#128190; Export CSV</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Console page ─────────────────────────────────────────────────────── -->
+  <section class="page" data-testid="page-console" hidden>
+    <fieldset class="panel" data-testid="panel-cache">
+      <legend>Result Cache (SQLite &middot; FIFO eviction)</legend>
+      <div class="field-row">
+        <span data-testid="cache-info" class="hint">Checking cache&hellip;</span>
+        <button type="button" data-testid="cache-clear">Clear cache</button>
+      </div>
+    </fieldset>
+
+    <fieldset class="panel console-log-panel" data-testid="panel-console-log">
+      <legend>Messages</legend>
+      <div class="console-log" data-testid="console-log"></div>
+    </fieldset>
+  </section>
+
+</main>
+
+<!-- ── New Project modal ────────────────────────────────────────────────── -->
+<div class="modal-overlay" data-testid="project-modal" hidden>
+  <div class="modal">
+    <h3>New Project</h3>
+    <label class="field-label">Name
+      <input type="text" data-testid="project-modal-name" placeholder="e.g. CO2/H2 + DIOX baseline">
+    </label>
+    <div class="modal-actions">
+      <button type="button" data-testid="project-modal-cancel">Cancel</button>
+      <button type="button" class="primary-btn" data-testid="project-modal-create">Create</button>
+    </div>
+  </div>
+</div>
+
+<script src="/vendor/plotly.min.js"></script>
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

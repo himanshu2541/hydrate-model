@@ -34,6 +34,7 @@ import numpy as np
 import pandas as pd
 
 from hydrate_project.ui.general_plotter import theme as th
+from hydrate_project.services.derived import add_dissociation_thermo
 
 
 # ── Column display metadata ───────────────────────────────────────────────────
@@ -68,35 +69,6 @@ def _fmt(val) -> str:
     return str(val)
 
 
-def _compute_dH_diss(df: pd.DataFrame) -> pd.Series:
-    """
-    Clausius-Clapeyron estimate of dissociation enthalpy:
-      ΔH_diss = −R × d(ln P) / d(1/T)
-    Returns a Series in kJ/mol aligned to df.index; NaN at edges.
-    """
-    R = 8.314
-    T = df["T (K)"].values.astype(float)
-    P = df["P_eq (MPa)"].values.astype(float)
-
-    inv_T = np.where(T > 0, 1.0 / T, np.nan)
-    ln_P = np.where(P > 0, np.log(P), np.nan)
-
-    dH = np.full(len(T), np.nan)
-    for i in range(1, len(T) - 1):
-        denom = inv_T[i + 1] - inv_T[i - 1]
-        if denom != 0 and not np.isnan(ln_P[i - 1]) and not np.isnan(ln_P[i + 1]):
-            dH[i] = -R * (ln_P[i + 1] - ln_P[i - 1]) / denom / 1000.0  # kJ/mol
-    # edges
-    if len(T) >= 2:
-        d0 = inv_T[1] - inv_T[0]
-        if d0 != 0 and not np.isnan(ln_P[0]) and not np.isnan(ln_P[1]):
-            dH[0] = -R * (ln_P[1] - ln_P[0]) / d0 / 1000.0
-        dn = inv_T[-1] - inv_T[-2]
-        if dn != 0 and not np.isnan(ln_P[-2]) and not np.isnan(ln_P[-1]):
-            dH[-1] = -R * (ln_P[-1] - ln_P[-2]) / dn / 1000.0
-    return pd.Series(dH, index=df.index, name="dH_diss (kJ/mol)")
-
-
 class PropertiesWindow(tk.Toplevel):
     """
     Thermodynamic properties viewer + CSV/clipboard data extractor.
@@ -120,19 +92,10 @@ class PropertiesWindow(tk.Toplevel):
         self._exp = experimental_data
         self._eos_names = list(results_dict.keys())
 
-        # Prepare enriched DataFrames (with computed dH_diss column)
-        self._rich: dict[str, pd.DataFrame] = {}
-        for name, df in results_dict.items():
-            rdf = df.copy()
-            try:
-                dH_series = _compute_dH_diss(rdf)
-                rdf["dH_diss (kJ/mol)"] = dH_series
-                rdf["dG_diss (kJ/mol)"] = 0.0  # ΔG = 0 at equilibrium by definition
-                rdf["dS_diss (kJ/mol.K)"] = dH_series / rdf["T (K)"] # ΔH =  ΔG + TΔS → ΔS = ΔH / T
-
-            except Exception:
-                pass
-            self._rich[name] = rdf
+        # Prepare enriched DataFrames (with computed dH_diss/dG_diss/dS_diss)
+        self._rich: dict[str, pd.DataFrame] = {
+            name: add_dissociation_thermo(df) for name, df in results_dict.items()
+        }
 
         self.title(title)
         self.geometry("1200x780")

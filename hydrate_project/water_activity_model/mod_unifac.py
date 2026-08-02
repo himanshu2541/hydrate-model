@@ -2,9 +2,17 @@ import logging
 
 import numpy as np
 from ..core.database import Database
+from ..core import correlations as corr
+from ..core.fitted_params import FITTED_PARAMS
 
 log = logging.getLogger(__name__)
 _warned_henry_placeholders: set[str] = set()
+
+# Guests K&S never parameterised: Henry params come from the fenced layer
+# (core/fitted_params.py), not database.HENRY_PARAMS. "henry_DIOX" has no
+# real train/test AARD (see fitted_params.py) -- warn whenever it's used.
+_FENCED_HENRY_SYMBOLS = {"H2": "henry_H2", "DIOX": "henry_DIOX"}
+_UNVALIDATED_HENRY_GASES = {"DIOX"}
 
 
 class ModifiedUnifac:
@@ -154,20 +162,20 @@ class ModifiedUnifac:
         }
 
     def calc_henry_constant(self, gas, T):
-        if gas not in self.database.HENRY_PARAMS:
+        if gas in self.database.HENRY_PARAMS:
+            params = self.database.HENRY_PARAMS[gas]
+        elif gas in _FENCED_HENRY_SYMBOLS:
+            params = FITTED_PARAMS[_FENCED_HENRY_SYMBOLS[gas]].value
+        else:
             return 1e9
 
-        if gas in getattr(self.database, "UNVALIDATED_HENRY_PARAMS", set()):
-            if gas not in _warned_henry_placeholders:
-                _warned_henry_placeholders.add(gas)
-                log.warning(
-                    "Henry's-law constant for '%s' is an unvalidated placeholder "
-                    "(not fitted to literature solubility data); results "
-                    "involving it should be treated as low-confidence.",
-                    gas,
-                )
+        if gas in _UNVALIDATED_HENRY_GASES and gas not in _warned_henry_placeholders:
+            _warned_henry_placeholders.add(gas)
+            log.warning(
+                "Henry's-law constant for '%s' is an unvalidated placeholder "
+                "(not fitted to literature solubility data); results "
+                "involving it should be treated as low-confidence.",
+                gas,
+            )
 
-        p = self.database.HENRY_PARAMS[gas]
-        rhs = p["H1"] + p["H2"] / T + p["H3"] * np.log(T) + p["H4"] * T
-        H_pa = self.database.P0 * np.exp(-rhs)
-        return H_pa
+        return corr.henry_constant(T, params, P0=self.database.P0)

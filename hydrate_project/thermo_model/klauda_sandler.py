@@ -24,7 +24,15 @@ import logging
 import numpy as np
 from scipy.integrate import quad
 
+from ..core import correlations as corr
+from ..core.exceptions import LangmuirIntegrationError
+from ..core.fitted_params import FITTED_PARAMS
+
 log = logging.getLogger(__name__)
+
+# Kihara params for guests missing from KS_KIHARA_PARAMS/GAS_DB entirely.
+# See core/fitted_params.py "dioxane_kihara" for provenance (undocumented).
+_FENCED_KIHARA = {"DIOX": FITTED_PARAMS["dioxane_kihara"].value}
 
 
 class KlaudaSandlerModel:
@@ -47,9 +55,11 @@ class KlaudaSandlerModel:
         db = self.database
 
         if str(gas + structure) not in self.kihara_params:
-            # Guest: from the K&S-specific Tee et al. table
+            # Guest: from the K&S-specific Tee et al. table, then the fenced
+            # layer for guests K&S never parameterised (e.g. DIOX), then
+            # GAS_DB as a last resort.
             ks = db.KS_KIHARA_PARAMS
-            gp = ks.get(gas, db.GUEST_DB[gas])  # fall back to GAS_DB if missing
+            gp = ks.get(gas) or _FENCED_KIHARA.get(gas) or db.GUEST_DB[gas]
             wp = ks["H2O"]
 
             a_g = gp["a"] * ANGSTROM
@@ -139,9 +149,12 @@ class KlaudaSandlerModel:
 
         try:
             integral, _ = quad(integrand, 1e-12, limit)
-            C = (4 * np.pi / (db.KB * T)) * integral  # in m³/J
-        except Exception:
-            C = 0.0
+        except Exception as exc:
+            raise LangmuirIntegrationError(
+                f"Kihara quadrature failed for {gas} in {structure} {cavity_type} "
+                f"at T={T} K: {exc}"
+            ) from exc
+        C = (4 * np.pi / (db.KB * T)) * integral  # in m³/J
 
         log.debug(
             "Calculated Langmuir constant for %s in %s with %s: C = %s",
@@ -189,11 +202,9 @@ class KlaudaSandlerModel:
     # ── Vapor pressure helpers (QL1 form, K&S Eq. 23) ─────────────────────
 
     def _ln_psat_water(self, T):
-        """ln(P_sat [Pa]) for ice (T<T0) or liquid water. K&S Table 5."""
-        phase = "ice" if T < self.database.T0 else "liquid"
-        p = self.database.WATER_VP_PARAMS[phase]
-        ln_psat = p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
-        return ln_psat
+        """ln(P_sat [Pa]) for ice (T<T0) or liquid water. K&S eqs. 7c/7d."""
+        p_sat = corr.P_sat_ice(T) if T < self.database.T0 else corr.P_sat_liquid_water(T)
+        return np.log(p_sat)
 
     def _mixture_vp_params(self, T, fugacities, structure):
         """
@@ -277,38 +288,16 @@ class KlaudaSandlerModel:
     # ── Molar volumes ──────────────────────────────────────────────────────
 
     def _V_hydrate(self, T, P, structure):
-        """
-        Pressure-dependent molar volume of empty hydrate (m³/mol).
-        K&S Eqs. 27-28.  P in Pa.
-        """
-        NA = self.database.NA
-        P_MPa = P / 1e6
-        if structure == "sI":
-            Nw = 46.0
-            a_sI = 11.835 + 2.217e-5 * T + 2.242e-6 * T**2
-            Vt = (a_sI**3) * 1e-30 * NA / Nw
-        else:  # sII
-            Nw = 136.0
-            a_sII = 17.13 + 2.249e-4 * T + 2.013e-6 * T**2 + 1.009e-9 * T**3
-            Vt = (a_sII**3) * 1e-30 * NA / Nw
-
-        Vc = -8.006e-9 * P_MPa + 5.448e-12 * P_MPa**2
-        return Vt + Vc
+        """Pressure-dependent molar volume of empty hydrate (m^3/mol). P in Pa."""
+        return corr.V_empty_hydrate(T, P / 1e6, structure)
 
     def _V_ice(self, T):
-        """Ice molar volume (m³/mol).  K&S Eq. 20."""
-        return 1.912e-5 + 8.387e-10 * T + 4.016e-12 * T**2
+        """Ice molar volume (m^3/mol)."""
+        return corr.V_ice(T)
 
     def _V_liquid(self, T, P):
-        """Liquid water molar volume (m³/mol).  K&S Eq. 21.  P in Pa."""
-        P_MPa = P / 1e6
-        ln_V = (
-            -10.9241
-            + 2.5e-4 * (T - 273.15)
-            - 3.532e-4 * (P_MPa - 0.101325)
-            + 1.559e-7 * (P_MPa - 0.101325) ** 2
-        )
-        return np.exp(ln_V)
+        """Liquid water molar volume (m^3/mol). P in Pa."""
+        return corr.V_liquid_water(T, P / 1e6)
 
     # ── Main fugacity calculations ─────────────────────────────────────────
 

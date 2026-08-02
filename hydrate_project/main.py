@@ -3,25 +3,32 @@ main.py
 -------
 Entry point for the Hydrate Equilibrium Thermodynamic Model.
 
-Launches the LauncherApp GUI where the user can:
-  - Set gas composition and temperature scan range
-  - Choose EOS models (PR, SRK, PT)
-  - Optionally enter experimental data for AAD calculation
-  - Run the solver and inspect results in the Plot Builder
+Default UI is now the browser app (hydrate_project/web/): same gas/liquid/
+temperature/EOS/experimental-data/cache/sweep controls and Plot Builder as
+before, served over HTTP so it's testable with Playwright. The Tkinter
+launcher (hydrate_project/ui/) is kept as a fallback -- `uv run model-tk`.
 
 Usage:
-    uv run python -m hydrate_project.main
-    # or
-    uv run model
+    uv run model            # web UI at http://127.0.0.1:8765
+    uv run model-tk          # legacy Tkinter UI
 """
 
 import warnings
 warnings.filterwarnings("ignore")
 
-from hydrate_project.ui.launcher.app import LauncherApp
-
 
 def main():
+    """Launch the web UI (default)."""
+    import uvicorn
+
+    print("Hydrate Equilibrium Model -- open http://127.0.0.1:8765 in your browser")
+    uvicorn.run("hydrate_project.web.api:app", host="127.0.0.1", port=8765)
+
+
+def main_tk():
+    """Launch the legacy Tkinter UI."""
+    from hydrate_project.ui.launcher.app import LauncherApp
+
     app = LauncherApp()
     app.mainloop()
 

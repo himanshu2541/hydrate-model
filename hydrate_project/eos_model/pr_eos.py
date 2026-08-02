@@ -7,13 +7,9 @@ class PREOS(EquationOfState):
         super().__init__(composition, database)
         self.y = np.array([composition.get(gas, 0.0) for gas in self.gases])
         self.R = self.database.R
-        self.kij = getattr(self.database, "KIJ_DB", {})
         self._cache = (
             {}
         )  # Optimization: Stores previously calculated Z and mixing rules
-
-    def _binary_interaction_parameter(self, gas1, gas2):
-        return self.kij.get((gas1, gas2), self.kij.get((gas2, gas1), 0.0))
 
     def _get_eos_params_and_Z(self, T, P):
         cache_key = (T, P)
