@@ -18,6 +18,10 @@ dependencies = [
     "scipy>=1.17.1",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
 
 [project.scripts]
 model = "hydrate_project.main:main"

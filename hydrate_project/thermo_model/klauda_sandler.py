@@ -19,8 +19,12 @@ Solver objective (compatible with existing EquilibriumSolver interface):
   objective = mu_w − mu_H = RT·(ln f_w^π − ln f_w^H) = 0  ✓
 """
 
+import logging
+
 import numpy as np
 from scipy.integrate import quad
+
+log = logging.getLogger(__name__)
 
 
 class KlaudaSandlerModel:
@@ -29,6 +33,7 @@ class KlaudaSandlerModel:
         self.database = database
         self.R = database.R
         self.kihara_params = {}
+        self._warned_proxies: set[str] = set()
 
     def _get_combined_kihara(self, gas, structure):
         """
@@ -58,8 +63,9 @@ class KlaudaSandlerModel:
             a = (a_g + a_w) / 2.0
             sigma = (s_g + s_w) / 2.0
             eps = np.sqrt(e_g * e_w)
-            print(
-                f"Combined Kihara params for {gas} in {structure}: a={a} m, σ={sigma} m, ε={eps} J"
+            log.debug(
+                "Combined Kihara params for %s in %s: a=%s m, sigma=%s m, eps=%s J",
+                gas, structure, a, sigma, eps,
             )
             self.kihara_params[str(gas + structure)] = (a, sigma, eps)
             return a, sigma, eps
@@ -74,8 +80,10 @@ class KlaudaSandlerModel:
         K&S Eqs. 6-7.  Returns potential in Joules.
         """
         if r >= (R_shell - a):
-            print(
-                f"Warning: r={r} m exceeds shell radius minus core (R_shell - a = {R_shell - a} m). Returning large potential."
+            log.debug(
+                "r=%s m exceeds shell radius minus core (R_shell - a = %s m); "
+                "returning large potential.",
+                r, R_shell - a,
             )
             return 1e50
 
@@ -135,8 +143,9 @@ class KlaudaSandlerModel:
         except Exception:
             C = 0.0
 
-        print(
-            f"[C] Calculated Langmuir constant for {gas} in {structure} with {cavity_type}: C = {C}"
+        log.debug(
+            "Calculated Langmuir constant for %s in %s with %s: C = %s",
+            gas, structure, cavity_type, C,
         )
         return C
 
@@ -195,10 +204,18 @@ class KlaudaSandlerModel:
 
         sII_promoters = ["DIOX", "THF", "CP", "C5H10"]
         heavy_fallback = "C3H8" if "C3H8" in vp_db else next(iter(vp_db.keys()))
-        
+
         for gas in fugacities:
             if gas in sII_promoters and structure == "sII":
                 # Bypass the mixing rule completely. The lattice belongs to the promoter.
+                if gas not in self._warned_proxies:
+                    self._warned_proxies.add(gas)
+                    log.warning(
+                        "No K&S empty-hydrate vapor-pressure parameters for %s in "
+                        "%s; substituting %s's parameters as a proxy. This is not "
+                        "physically validated for %s and results may be inaccurate.",
+                        gas, structure, heavy_fallback, gas,
+                    )
                 return vp_db[heavy_fallback]
 
         # Optimization: if pure gas, skip occupancy math
@@ -250,7 +267,11 @@ class KlaudaSandlerModel:
         """ln(P_sat^β [Pa]) using mixture-averaged QL1 parameters."""
         p = self._mixture_vp_params(T, fugacities, structure)
         ln_psat = p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
-        print(f"Calculated empty hydrate vapor pressure at T={T} K for {structure} with fugacities {fugacities}: ln(P_sat^β) = {ln_psat}")
+        log.debug(
+            "Calculated empty hydrate vapor pressure at T=%s K for %s with "
+            "fugacities %s: ln(P_sat^beta) = %s",
+            T, structure, fugacities, ln_psat,
+        )
         return ln_psat
 
     # ── Molar volumes ──────────────────────────────────────────────────────

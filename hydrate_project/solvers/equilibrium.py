@@ -1,7 +1,11 @@
+import logging
+
 import numpy as np
 import pandas as pd
 from scipy.optimize import root_scalar
 from ..water_activity_model.mod_unifac import ModifiedUnifac
+
+log = logging.getLogger(__name__)
 
 
 class EquilibriumSolver:
@@ -88,23 +92,31 @@ class EquilibriumSolver:
                     self.promoter_frac * gamma_dict.get(self.promoter_name, 1.0) * P_sat
                 )
 
-            return f_dict, phi_val, aw_val, gamma_dict.get("H2O", 1.0)
+            return f_dict, phi_val, aw_val, gamma_dict.get("H2O", 1.0), False
 
-        except Exception:
+        except Exception as exc:
+            log.warning(
+                "UNIFAC water-activity calculation failed (%s); falling back to a "
+                "crude Henry's-law approximation (magic constant 7.35e7 Pa). "
+                "Treat this point's results as low-confidence.",
+                exc,
+            )
             aw_val = max(
                 1.0
                 - sum(f_dict.get(g, 0) / 7.35e7 for g in f_dict.keys())
                 - self.promoter_frac,
                 0.0,
             )
-            return f_dict, phi_val, aw_val, 1.0
+            return f_dict, phi_val, aw_val, 1.0, True
 
     def _calculate_state(self, T, P, structure):
         """Calculate all thermodynamic properties at a given T, P."""
         if np.isnan(P) or P <= 0:
             return None
 
-        f_dict, phi_val, aw_val, gamma_val = self._get_liquid_and_fugacities(T, P)
+        f_dict, phi_val, aw_val, gamma_val, fallback_used = (
+            self._get_liquid_and_fugacities(T, P)
+        )
 
         mu_w = self.hydrate_model.chemical_potential_difference_water(
             T, P, aw_val, structure
@@ -155,6 +167,7 @@ class EquilibriumSolver:
         state = {
             "P_eq (MPa)": P / 1e6,
             "Z": Z_val,
+            "Fallback_Used": fallback_used,
             "a_w": aw_val,
             "gamma_w": gamma_val,
             "Delta_Mu_w": mu_w,
@@ -206,7 +219,7 @@ class EquilibriumSolver:
             if P <= 0:
                 return 1e6 - P
 
-            f_dict, _, aw_val, _ = self._get_liquid_and_fugacities(T, P)
+            f_dict, _, aw_val, _, _ = self._get_liquid_and_fugacities(T, P)
 
             mu_w = self.hydrate_model.chemical_potential_difference_water(
                 T, P, aw_val, structure
@@ -240,7 +253,7 @@ class EquilibriumSolver:
                 return self._calculate_state(T, sol.root, structure)
             return None
         except Exception as e:
-            print(f"Solver crashed at {T} K: {repr(e)}") 
+            log.debug("Solver crashed at %s K: %r", T, e)
             return None
 
     def find_optimum_structure(
@@ -260,7 +273,7 @@ class EquilibriumSolver:
             P_sI = state_sI["P_eq (MPa)"] if state_sI else np.nan
             P_sII = state_sII["P_eq (MPa)"] if state_sII else np.nan
 
-            print(f"T={T:.2f} K: P_sI={P_sI:.3f} MPa, P_sII={P_sII:.3f} MPa")
+            log.info("T=%.2f K: P_sI=%.3f MPa, P_sII=%.3f MPa", T, P_sI, P_sII)
 
             opt_struct = None
             opt_state = None

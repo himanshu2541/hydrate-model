@@ -1,5 +1,10 @@
+import logging
+
 import numpy as np
 from ..core.database import Database
+
+log = logging.getLogger(__name__)
+_warned_henry_placeholders: set[str] = set()
 
 
 class ModifiedUnifac:
@@ -151,6 +156,16 @@ class ModifiedUnifac:
     def calc_henry_constant(self, gas, T):
         if gas not in self.database.HENRY_PARAMS:
             return 1e9
+
+        if gas in getattr(self.database, "UNVALIDATED_HENRY_PARAMS", set()):
+            if gas not in _warned_henry_placeholders:
+                _warned_henry_placeholders.add(gas)
+                log.warning(
+                    "Henry's-law constant for '%s' is an unvalidated placeholder "
+                    "(not fitted to literature solubility data); results "
+                    "involving it should be treated as low-confidence.",
+                    gas,
+                )
 
         p = self.database.HENRY_PARAMS[gas]
         rhs = p["H1"] + p["H2"] / T + p["H3"] * np.log(T) + p["H4"] * T

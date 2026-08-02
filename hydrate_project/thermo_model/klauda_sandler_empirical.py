@@ -19,7 +19,11 @@ Solver objective (compatible with existing EquilibriumSolver interface):
   objective = mu_w − mu_H = RT·(ln f_w^π − ln f_w^H) = 0  ✓
 """
 
+import logging
+
 import numpy as np
+
+log = logging.getLogger(__name__)
 
 
 class KlaudaSandlerEmpiricalModel:
@@ -36,14 +40,22 @@ class KlaudaSandlerEmpiricalModel:
         """
         db = self.database
 
-        # formula Cml(T) = exp(Aml + Bml/T + Dml/T²) 
+        # formula Cml(T) = exp(Aml + Bml/T + Dml/T²)
         params = db.KS_EMP_LANGMUIR_PARAMS[structure][cavity_type].get(gas)
         if params is None:
-            raise ValueError(f"Langmuir parameters for {gas} not found in {structure} {cavity_type}")
+            raise NotImplementedError(
+                f"KlaudaSandlerEmpiricalModel has no empirical Langmuir parameters "
+                f"for '{gas}' in {structure} {cavity_type} (only fitted for CO2/H2 "
+                f"gas mixtures). Liquid promoters like DIOX require the Kihara-"
+                f"integration KlaudaSandlerModel instead."
+            )
 
         A, B, D = params["A"], params["B"], params["D"]
         C = np.exp(A + B / T + D / (T ** 2))
-        print(f"Calculated Langmuir constant for {gas} in {structure} {cavity_type} at T={T} K: {C}")
+        log.debug(
+            "Calculated Langmuir constant for %s in %s %s at T=%s K: %s",
+            gas, structure, cavity_type, T, C,
+        )
         return C
 
     def calc_cage_occupancy(self, T, fugacities, structure, cavity_type):

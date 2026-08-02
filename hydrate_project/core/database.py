@@ -259,8 +259,14 @@ class Database:
         self.HENRY_PARAMS: dict = {
             "CO2": {"H1": -159.868, "H2": 8742.426, "H3": 21.6712, "H4": -0.00110},
             "H2": {"H1": -86.8550, "H2": 4178.717, "H3": 10.4935, "H4": 0.00632},
+            # UNVALIDATED PLACEHOLDER: not fitted to any literature solubility
+            # data (cf. CO2/H2 above, which are). Do not trust quantitatively;
+            # see UNVALIDATED_HENRY_PARAMS below, which makes calc_henry_constant
+            # warn whenever this entry is actually used.
             "DIOX": {"H1": -200.0, "H2": 10000.0, "H3": 0.0, "H4": 0.0},
         }
+        # Keys in HENRY_PARAMS that are placeholders, not literature-fitted.
+        self.UNVALIDATED_HENRY_PARAMS: set = {"DIOX"}
 
         # ── Modified UNIFAC (Dortmund) Groups ──────────────
         self.MOD_UNIFAC_GROUPS: dict = {

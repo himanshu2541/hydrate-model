@@ -16,18 +16,29 @@ from tkinter import ttk, filedialog, messagebox
 from typing import Optional
 import datetime
 
-from hydrate_project.utils.general_plotter import theme as th
-from hydrate_project.utils.general_plotter.canvas import PlotCanvas
-from hydrate_project.utils.general_plotter.sidebar import Sidebar
-from hydrate_project.utils.general_plotter.core import build_grid
+from hydrate_project.ui.general_plotter import theme as th
+from hydrate_project.ui.general_plotter.canvas import PlotCanvas
+from hydrate_project.ui.general_plotter.sidebar import Sidebar
+from hydrate_project.ui.general_plotter.core import build_grid
 
 
 class _PlotBuilderMixin:
     """All UI and logic shared between the Tk and Toplevel variants."""
 
-    def _init_content(self, results_dict, experimental_data, title):
+    def _init_content(
+        self,
+        results_dict,
+        experimental_data,
+        title,
+        series_label="EOS models",
+        default_row_vars=None,
+        default_col_vars=None,
+    ):
         self._results = results_dict
         self._exp_data = experimental_data
+        self._series_label = series_label
+        self._default_row_vars = default_row_vars
+        self._default_col_vars = default_col_vars
         self.title(title)
         self.geometry("1400x820")
         self.minsize(900, 600)
@@ -49,6 +60,9 @@ class _PlotBuilderMixin:
             results_dict=self._results,
             on_update=self._on_update,
             on_save=self._on_save,
+            series_label=self._series_label,
+            default_row_vars=self._default_row_vars,
+            default_col_vars=self._default_col_vars,
         )
         self._sidebar.grid(row=0, column=0, sticky="nsew")
         ttk.Separator(main, orient="vertical").grid(row=0, column=1, sticky="ns")
@@ -136,9 +150,19 @@ class PlotBuilderApp(_PlotBuilderMixin, tk.Tk):
         results_dict,
         experimental_data=None,
         title="Hydrate — General Plot Builder",
+        series_label="EOS models",
+        default_row_vars=None,
+        default_col_vars=None,
     ):
         tk.Tk.__init__(self)
-        self._init_content(results_dict, experimental_data, title)
+        self._init_content(
+            results_dict,
+            experimental_data,
+            title,
+            series_label,
+            default_row_vars,
+            default_col_vars,
+        )
 
 
 class PlotBuilderWindow(_PlotBuilderMixin, tk.Toplevel):
@@ -150,6 +174,16 @@ class PlotBuilderWindow(_PlotBuilderMixin, tk.Toplevel):
         results_dict,
         experimental_data=None,
         title="Hydrate — General Plot Builder",
+        series_label="EOS models",
+        default_row_vars=None,
+        default_col_vars=None,
     ):
         tk.Toplevel.__init__(self, master)
-        self._init_content(results_dict, experimental_data, title)
+        self._init_content(
+            results_dict,
+            experimental_data,
+            title,
+            series_label,
+            default_row_vars,
+            default_col_vars,
+        )

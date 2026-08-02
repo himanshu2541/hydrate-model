@@ -33,7 +33,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from hydrate_project.utils.general_plotter import theme as th
+from hydrate_project.ui.general_plotter import theme as th
 
 
 # ── Column display metadata ───────────────────────────────────────────────────
@@ -125,7 +125,11 @@ class PropertiesWindow(tk.Toplevel):
         for name, df in results_dict.items():
             rdf = df.copy()
             try:
-                rdf["dH_diss (kJ/mol)"] = _compute_dH_diss(rdf)
+                dH_series = _compute_dH_diss(rdf)
+                rdf["dH_diss (kJ/mol)"] = dH_series
+                rdf["dG_diss (kJ/mol)"] = 0.0  # ΔG = 0 at equilibrium by definition
+                rdf["dS_diss (kJ/mol.K)"] = dH_series / rdf["T (K)"] # ΔH =  ΔG + TΔS → ΔS = ΔH / T
+
             except Exception:
                 pass
             self._rich[name] = rdf
@@ -405,6 +409,8 @@ class PropertiesWindow(tk.Toplevel):
             "P_eq (MPa)",
             "Optimum_Structure",
             "Z",
+            "dG_diss (kJ/mol)",
+            "dS_diss (kJ/mol.K)",
             "dH_diss (kJ/mol)",
             "a_w",
             "gamma_w",
@@ -500,6 +506,15 @@ class PropertiesWindow(tk.Toplevel):
             dH = df["dH_diss (kJ/mol)"].dropna()
             if len(dH):
                 _card("ΔH_diss", f"{dH.median():.1f} kJ/mol", th.MAUVE)
+        if "dS_diss (kJ/mol.K)" in df.columns:
+            dS = df["dS_diss (kJ/mol.K)"].dropna()
+            if len(dS):
+                _card("ΔS_diss", f"{dS.median():.3f} kJ/mol.K", th.MAUVE)
+                
+        if "dG_diss (kJ/mol)" in df.columns:
+            dG = df["dG_diss (kJ/mol)"].dropna()
+            if len(dG):
+                _card("ΔG_diss", f"{dG.median():.1f} kJ/mol", th.MAUVE)
 
     def _clear_filter(self):
         self._Tmin_v.set("")
