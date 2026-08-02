@@ -78,7 +78,7 @@ def run_model(
             )
             status_cb(f"[{eos_name}]  scanning {len(T_range)} temperature points…")
             df = solver.find_optimum_structure(
-                T_range=T_range, P_initial_guess=2.5e6, solver_method="bisect"
+                T_range=T_range, P_initial_guess=2.5e6, solver_method="brentq"
             )
             results[eos_name] = df
             status_cb(f"[{eos_name}]  ✓ done")

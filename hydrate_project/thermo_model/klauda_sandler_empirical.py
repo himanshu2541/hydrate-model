@@ -23,6 +23,8 @@ import logging
 
 import numpy as np
 
+from ..core import correlations as corr
+
 log = logging.getLogger(__name__)
 
 
@@ -98,12 +100,9 @@ class KlaudaSandlerEmpiricalModel:
     # ── Vapor pressure helpers (QL1 form, K&S Eq. 23) ─────────────────────
 
     def _ln_psat_water(self, T):
-        """ln(P_sat [Pa]) for ice (T<T0) or liquid water. K&S Table 5."""
-        phase = "ice" if T < self.database.T0 else "liquid"
-        p = self.database.WATER_VP_PARAMS[phase]
-        ln_psat = p["A"] * np.log(T) + p["B"] / T + p["C"] + p["D"] * T
-
-        return ln_psat
+        """ln(P_sat [Pa]) for ice (T<T0) or liquid water. K&S eqs. 7c/7d."""
+        p_sat = corr.P_sat_ice(T) if T < self.database.T0 else corr.P_sat_liquid_water(T)
+        return np.log(p_sat)
 
     def _mixture_vp_params(self, T, fugacities, structure):
         """
@@ -157,38 +156,16 @@ class KlaudaSandlerEmpiricalModel:
     # ── Molar volumes ──────────────────────────────────────────────────────
 
     def _V_hydrate(self, T, P, structure):
-        """
-        Pressure-dependent molar volume of empty hydrate (m³/mol).
-        K&S Eqs. 27-28.  P in Pa.
-        """
-        NA = self.database.NA
-        P_MPa = P / 1e6
-        if structure == "sI":
-            Nw = 46.0
-            a_sI = 11.835 + 2.217e-5 * T + 2.242e-6 * T**2
-            Vt = (a_sI**3) * 1e-30 * NA / Nw
-        else:  # sII
-            Nw = 136.0
-            a_sII = 17.13 + 2.249e-4 * T + 2.013e-6 * T**2 + 1.009e-9 * T**3
-            Vt = (a_sII**3) * 1e-30 * NA / Nw
-
-        Vc = -8.006e-9 * P_MPa + 5.448e-12 * P_MPa**2
-        return Vt + Vc
+        """Pressure-dependent molar volume of empty hydrate (m^3/mol). P in Pa."""
+        return corr.V_empty_hydrate(T, P / 1e6, structure)
 
     def _V_ice(self, T):
-        """Ice molar volume (m³/mol).  K&S Eq. 20."""
-        return 1.912e-5 + 8.387e-10 * T + 4.016e-12 * T**2
+        """Ice molar volume (m^3/mol)."""
+        return corr.V_ice(T)
 
     def _V_liquid(self, T, P):
-        """Liquid water molar volume (m³/mol).  K&S Eq. 21.  P in Pa."""
-        P_MPa = P / 1e6
-        ln_V = (
-            -10.9241
-            + 2.5e-4 * (T - 273.15)
-            - 3.532e-4 * (P_MPa - 0.101325)
-            + 1.559e-7 * (P_MPa - 0.101325) ** 2
-        )
-        return np.exp(ln_V)
+        """Liquid water molar volume (m^3/mol). P in Pa."""
+        return corr.V_liquid_water(T, P / 1e6)
 
     # ── Main fugacity calculations ─────────────────────────────────────────
 

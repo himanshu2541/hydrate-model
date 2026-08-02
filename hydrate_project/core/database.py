@@ -1,8 +1,10 @@
 class Database:
     def __init__(self):
-        self.R = 8.314
-        self.KB = 1.38064852e-23
-        self.NA = 6.022e23
+        # CODATA values (must satisfy R = KB * NA to machine precision --
+        # see tests/test_correlations.py::test_R_equals_kB_times_NA).
+        self.R = 8.314462618
+        self.KB = 1.380649e-23
+        self.NA = 6.02214076e23
         self.T0 = 273.15
         self.P0 = 1.01325e5
 
@@ -70,12 +72,9 @@ class Database:
             },
         }
 
-        # ── K&S 2000 Table 5: QL1 vapor pressure of pure water phases ─────────────
-        # ln(P_sat [Pa]) = A*ln(T) + B/T + C + D*T
-        self.WATER_VP_PARAMS: dict = {
-            "ice": {"A": 4.6056, "B": -5501.1243, "C": 2.9446, "D": -8.1431e-3},
-            "liquid": {"A": 4.1539, "B": -5500.9332, "C": 7.6537, "D": -16.1277e-3},
-        }
+        # Water/ice vapor pressure (K&S eqs. 7c/7d) now lives as pure functions
+        # in core/correlations.py (P_sat_liquid_water, P_sat_ice) -- single
+        # source of truth, no duplicate table here.
 
         # ── Gas-phase formers ─────────────────────────────────────────────────
         self.GAS_DB: dict = {
@@ -100,15 +99,15 @@ class Database:
         }
 
         # ── Liquid-phase thermodynamic promoters ──────────────────────────────
+        # DIOX Kihara params (sigma/eps_k/a) are NOT here: their provenance
+        # is undocumented (see core/fitted_params.py "dioxane_kihara"), so
+        # they live in the fenced layer, not this sourced-constants table.
         self.PROMOTER_DB: dict = {
             "DIOX": {
                 "display_name": "1,4-Dioxane",
                 "Tc": 587.0,
                 "Pc": 51.4e5,
                 "omega": 0.281,
-                "sigma": 3.38,
-                "eps_k": 840.7,
-                "a": 0.85,
                 "is_linear": False,
                 "stoichiometric_x": 0.0556,
                 "delta_H_vap": 34700.0,
@@ -121,11 +120,13 @@ class Database:
         self._guest_db_cache: dict | None = None
 
         # ── Hydrate structure parameters ──────────────────────────────────────
-        # SINGLE-SHELL per cavity type — consistent with K&S 2000 Kihara params.
-        # Cavity radii (Rc) and coordination numbers (z):
+        # Cavity radii (Rc) and coordination numbers (z), multi-shell:
         #   K&S 2000, Table 1 / van Stackelberg & Müller 1954
         # nu  — cavities per water molecule
-        # a_0, n_0 — JH1985 Q* correlation (only used if USE_Q_STAR=True)
+        # No Q* asphericity factor here: it is a John-Papadopoulos-Holder
+        # (1985) device for compensating a single-shell cell potential, and
+        # double-counts with this three-shell KS2000 potential (see
+        # AUDIT_AND_MIGRATION_PLAN.md C3).
         self.STRUCTURE_DB: dict = {
             "sI": {
                 "small": {
@@ -136,8 +137,6 @@ class Database:
                         "2": {"R": 6.593, "z": 20},
                         "3": {"R": 8.086, "z": 50},
                     },
-                    "a_0": 35.3446,
-                    "n_0": 0.973,
                 },
                 "large": {
                     "type": "5^12 6^2",
@@ -147,8 +146,6 @@ class Database:
                         "2": {"R": 7.078, "z": 24},
                         "3": {"R": 8.285, "z": 50},
                     },
-                    "a_0": 14.1161,
-                    "n_0": 0.826,
                 },
                 "lattice_type": "sI",
             },
@@ -161,8 +158,6 @@ class Database:
                         "2": {"R": 6.667, "z": 20},
                         "3": {"R": 8.079, "z": 50},
                     },
-                    "a_0": 35.3446,
-                    "n_0": 0.973,
                 },
                 "large": {
                     "type": "5^12 6^4",
@@ -172,59 +167,19 @@ class Database:
                         "2": {"R": 7.464, "z": 28},
                         "3": {"R": 8.782, "z": 50},
                     },
-                    "a_0": 782.8469,
-                    "n_0": 2.3129,
                 },
                 "lattice_type": "sII",
             },
         }
 
-        # ── Reference chemical potential parameters ────────────────────────────
-        # Source: K&S 2000, Table 2 (self-consistent with their Kihara params).
-        #
-        # Sign: Δ = (empty hydrate lattice) − (pure liquid water reference)
-        # dMu0    : Δμ°_w at T0, P0  [J/mol]
-        # dH0_liq : Δh°_w (liquid water basis)  [J/mol]
-        # dH0_ice : Δh°_w (ice basis) = dH0_liq + ΔH_fusion_ice ≈ dH0_liq + 6008
-        # dV      : ΔV_w  [m³/mol]
-        # del_CP0_liq / _b_factor : ΔCp  [J/(mol·K)] and linear coeff [J/(mol·K²)]
-        self.REFERENCE_PROPS: dict = {
-            "sI": {
-                "dMu0": 1120.0,  # J/mol
-                "dH0_ice": 1714.0,  # J/mol
-                "dH0_liq": -4297.0,  # J/mol
-                "dV_ice": 3.0e-6,
-                "dV_liq": 4.6e-6,
-                "del_CP0_ice": 3.315,
-                "del_CP0_liq": -34.582,  # J/(mol·K)
-                "del_CP0_ice_b_factor": 0.012,
-                "del_CP0_liq_b_factor": 0.189,  # J/(mol·K²)
-                "a_w": 0,
-                "sigma_w": 3.56438,
-                "eps_k_w": 102.134,
-            },
-            "sII": {
-                "dMu0": 931.0,  # J/mol
-                "dH0_ice": 1400.0,  # J/mol
-                "dH0_liq": -4611.0,  # J/mol
-                "dV_ice": 3.4e-6,
-                "dV_liq": 5.0e-6,
-                "del_CP0_ice": 1.029,
-                "del_CP0_liq": -36.861,  # J/(mol·K)
-                "del_CP0_ice_b_factor": 0.004,
-                "del_CP0_liq_b_factor": 0.181,  # J/(mol·K²)
-                "a_w": 0,
-                "sigma_w": 3.56438,
-                "eps_k_w": 102.134,
-            },
-        }
-
+        # k_ij(CO2, H2) is NOT here: it is a hand-tuned scalar with no
+        # held-out validation (see core/fitted_params.py "k_ij_CO2_H2"),
+        # so it lives in the fenced layer. eos_model/*.py's
+        # _binary_interaction_parameter() consults FITTED_PARAMS for that
+        # one pair and this table for everything else.
         self.KIJ_DB: dict = {
             ("CO2", "CO2"): 0.0,
             ("H2", "H2"): 0.0,
-            ("CO2", "H2"): 0.162,  # Crucial for accurate CO2-H2 mixture fugacity
-            ("H2", "CO2"): 0.162,  # Keep it symmetric
-            # Ensure your other interactions (like water) are defined
             ("CO2", "H2O"): 0.1896,  # Standard PR value for CO2-H2O
             ("H2", "H2O"): 0.0,  # H2/H2O interaction is negligible
         }
@@ -232,41 +187,13 @@ class Database:
         # ── Henry's law: K&S 2000, Table 4 ───────────────────────────────────
         # −ln(H/P0) = H1 + H2/T + H3·ln(T) + H4·T
         #
-        # CO2 : Klauda & Sandler 2000, Table 4.
-        #
-        # H2  : K&S 2000 do not include H2.  Parameters fitted here to
-        #        Battino (IUPAC Solubility Data Series, Vol. 5/6, 1981/1984)
-        #        experimental mole-fraction solubility data in the hydrate
-        #        temperature window (273–300 K):
-        #
-        #          T = 273.15 K → x_H2 = 1.776×10⁻⁵ → kH = 5.706×10⁹ Pa
-        #          T = 278.15 K → x_H2 = 1.628×10⁻⁵ → kH = 6.224×10⁹ Pa
-        #          T = 283.15 K → x_H2 = 1.511×10⁻⁵ → kH = 6.706×10⁹ Pa
-        #          T = 298.15 K → x_H2 = 1.400×10⁻⁵ → kH = 7.237×10⁹ Pa
-        #
-        #        Two-parameter least-squares (H3 = H4 = 0) over 273–298 K:
-        #          H1 = -13.767,  H2 = 772.7
-        #
-        #        This gives kH ≈ 5 880 MPa at 276 K, vs. the erroneous
-        #        fallback of 1 000 MPa that caused ~1.7 MPa underprediction
-        #        of equilibrium pressure in CO2/H2 mixture hydrates.
-        #
-        #        Root cause of the bug: without this entry, calc_henry_constant
-        #        returned 1e9 Pa (1 000 MPa), overestimating x_H2 by ~6×,
-        #        which lowered a_w and mu_w, so the bisection solver found
-        #        equilibrium at too-low pressure.
-        # K&S 2003 Table 1: Henry constants
+        # CO2 is the only literature [V] entry here (Klauda & Sandler 2000,
+        # Table 4). H2 and DIOX are not in K&S 2000/2003 at all -- those live
+        # in core/fitted_params.py ("henry_H2", "henry_DIOX") with their
+        # provenance and (for H2) an honestly-reported train AAD.
         self.HENRY_PARAMS: dict = {
             "CO2": {"H1": -159.868, "H2": 8742.426, "H3": 21.6712, "H4": -0.00110},
-            "H2": {"H1": -86.8550, "H2": 4178.717, "H3": 10.4935, "H4": 0.00632},
-            # UNVALIDATED PLACEHOLDER: not fitted to any literature solubility
-            # data (cf. CO2/H2 above, which are). Do not trust quantitatively;
-            # see UNVALIDATED_HENRY_PARAMS below, which makes calc_henry_constant
-            # warn whenever this entry is actually used.
-            "DIOX": {"H1": -200.0, "H2": 10000.0, "H3": 0.0, "H4": 0.0},
         }
-        # Keys in HENRY_PARAMS that are placeholders, not literature-fitted.
-        self.UNVALIDATED_HENRY_PARAMS: set = {"DIOX"}
 
         # ── Modified UNIFAC (Dortmund) Groups ──────────────
         self.MOD_UNIFAC_GROUPS: dict = {

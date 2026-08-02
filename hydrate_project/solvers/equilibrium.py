@@ -4,8 +4,18 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import root_scalar
 from ..water_activity_model.mod_unifac import ModifiedUnifac
+from ..core.exceptions import HydrateModelError, WaterActivityError, ConvergenceError
+from ..core.fitted_params import FITTED_PARAMS
 
 log = logging.getLogger(__name__)
+
+# Infinite-dilution partial molar volumes for the Poynting correction
+# (K&S 2000 eq. 19). Neither is an in-house regression -- see
+# core/fitted_params.py "v_inf_CO2"/"v_inf_H2" for provenance.
+_V_INF = {
+    "CO2": FITTED_PARAMS["v_inf_CO2"].value,
+    "H2": FITTED_PARAMS["v_inf_H2"].value,
+}
 
 
 class EquilibriumSolver:
@@ -28,21 +38,9 @@ class EquilibriumSolver:
     def _get_liquid_and_fugacities(self, T, P):
         """Centralized method to calculate fugacities and liquid water activity.
 
-        Partial molar volumes at infinite dilution (v_inf) are used in the
-        Poynting correction for gas solubility (K&S 2000, Eq. 19):
-
-            x_gas = f_gas / (H(T) * exp(v_inf * P / RT))
-
-        Literature sources for v_inf:
-          CO2 : 32 mL/mol  — Klauda & Sandler 2000, consistent with their eq.
-          H2  : 26.1 mL/mol — Brelvi & O'Connell (AIChE J, 1972); also
-                consistent with scaled-particle theory for H2 at infinite
-                dilution in water near 273–300 K.
-
-        Note: the original code used v_inf(H2) = 15 mL/mol which is too low
-        (it underestimates the Poynting correction for H2 by ~40%).  The
-        correct value is ~26 mL/mol.  Together with the H2 Henry's-law fix in
-        database.py this produces the largest improvement to mixture results.
+        Partial molar volumes at infinite dilution (v_inf, see _V_INF above)
+        are used in the Poynting correction for gas solubility (K&S 2000,
+        eq. 19): x_gas = f_gas / (H(T) * exp(v_inf * P / RT)).
         """
         f_dict, phi_val = self.eos.calc_fugacities(T, P)
 
@@ -50,12 +48,10 @@ class EquilibriumSolver:
             unifac_pure = ModifiedUnifac({"H2O": 1.0}, self.database)
             x_gas_total = 0.0
 
-            v_inf = {"CO2": 32.0e-6, "H2": 26.1e-6}
-
             for gas in list(f_dict.keys()):
                 H_val_base = unifac_pure.calc_henry_constant(gas, T)
                 poynting_factor = np.exp(
-                    (v_inf.get(gas, 32e-6) * P) / (self.database.R * T)
+                    (_V_INF.get(gas, 32e-6) * P) / (self.database.R * T)
                 )
                 x_gas = f_dict[gas] / (H_val_base * poynting_factor)
                 x_gas_total += x_gas
@@ -92,31 +88,19 @@ class EquilibriumSolver:
                     self.promoter_frac * gamma_dict.get(self.promoter_name, 1.0) * P_sat
                 )
 
-            return f_dict, phi_val, aw_val, gamma_dict.get("H2O", 1.0), False
+            return f_dict, phi_val, aw_val, gamma_dict.get("H2O", 1.0)
 
         except Exception as exc:
-            log.warning(
-                "UNIFAC water-activity calculation failed (%s); falling back to a "
-                "crude Henry's-law approximation (magic constant 7.35e7 Pa). "
-                "Treat this point's results as low-confidence.",
-                exc,
-            )
-            aw_val = max(
-                1.0
-                - sum(f_dict.get(g, 0) / 7.35e7 for g in f_dict.keys())
-                - self.promoter_frac,
-                0.0,
-            )
-            return f_dict, phi_val, aw_val, 1.0, True
+            raise WaterActivityError(
+                f"UNIFAC water-activity calculation failed at T={T} K, P={P} Pa: {exc}"
+            ) from exc
 
     def _calculate_state(self, T, P, structure):
         """Calculate all thermodynamic properties at a given T, P."""
         if np.isnan(P) or P <= 0:
             return None
 
-        f_dict, phi_val, aw_val, gamma_val, fallback_used = (
-            self._get_liquid_and_fugacities(T, P)
-        )
+        f_dict, phi_val, aw_val, gamma_val = self._get_liquid_and_fugacities(T, P)
 
         mu_w = self.hydrate_model.chemical_potential_difference_water(
             T, P, aw_val, structure
@@ -167,7 +151,6 @@ class EquilibriumSolver:
         state = {
             "P_eq (MPa)": P / 1e6,
             "Z": Z_val,
-            "Fallback_Used": fallback_used,
             "a_w": aw_val,
             "gamma_w": gamma_val,
             "Delta_Mu_w": mu_w,
@@ -208,7 +191,26 @@ class EquilibriumSolver:
 
         return state
 
-    def evaluate_structure(self, T, P_initial_guess, structure, method="newton"):
+    def _find_bracket(self, objective, P_initial_guess, P_max=100e6):
+        """Expand outward from P_initial_guess until objective changes sign.
+
+        root_scalar's derivative-free methods (newton-as-secant, in
+        particular) are being asked to bracket a piecewise-smooth objective
+        (it contains `quad` calls with a hard wall at R - a); brentq needs an
+        explicit sign-changing bracket instead. Start at
+        [0.5*P_guess, 2*P_guess] and double outward until P_max.
+        """
+        lo, hi = 0.5 * P_initial_guess, 2.0 * P_initial_guess
+        f_lo, f_hi = objective(lo), objective(hi)
+        while f_lo * f_hi > 0 and hi < P_max:
+            lo /= 2.0
+            hi *= 2.0
+            f_lo, f_hi = objective(lo), objective(hi)
+        if f_lo * f_hi > 0:
+            return None
+        return lo, hi
+
+    def evaluate_structure(self, T, P_initial_guess, structure, method="brentq"):
         """
         Runs the pressure iteration loop and returns the full thermodynamic state.
         FIX: objective now calls _get_liquid_and_fugacities to stay consistent
@@ -219,7 +221,7 @@ class EquilibriumSolver:
             if P <= 0:
                 return 1e6 - P
 
-            f_dict, _, aw_val, _, _ = self._get_liquid_and_fugacities(T, P)
+            f_dict, _, aw_val, _ = self._get_liquid_and_fugacities(T, P)
 
             mu_w = self.hydrate_model.chemical_potential_difference_water(
                 T, P, aw_val, structure
@@ -230,7 +232,15 @@ class EquilibriumSolver:
             return mu_w - mu_h
 
         try:
-            if method == "newton":
+            if method == "brentq":
+                bracket = self._find_bracket(objective, P_initial_guess)
+                if bracket is None:
+                    raise ConvergenceError(
+                        f"No sign change found for {structure} at T={T} K within "
+                        f"P in [0, 100 MPa] starting from guess {P_initial_guess} Pa."
+                    )
+                sol = root_scalar(objective, bracket=list(bracket), method="brentq")
+            elif method == "newton":
                 sol = root_scalar(
                     objective, x0=P_initial_guess, method="newton", maxiter=50
                 )
@@ -251,13 +261,25 @@ class EquilibriumSolver:
 
             if sol.converged:
                 return self._calculate_state(T, sol.root, structure)
+            log.debug(
+                "Root-find did not converge for %s at T=%s K (method=%s).",
+                structure, T, method,
+            )
             return None
-        except Exception as e:
-            log.debug("Solver crashed at %s K: %r", T, e)
+        except HydrateModelError as e:
+            log.debug(
+                "%s at T=%s K, structure=%s: %s", type(e).__name__, T, structure, e
+            )
+            return None
+        except (ValueError, RuntimeError) as e:
+            log.debug(
+                "Root-find failed for %s at T=%s K (method=%s): %s",
+                structure, T, method, e,
+            )
             return None
 
     def find_optimum_structure(
-        self, T_range, P_initial_guess=2.5e6, solver_method="newton"
+        self, T_range, P_initial_guess=2.5e6, solver_method="brentq"
     ):
         """Compares sI and sII and returns a DataFrame of results."""
         all_results = []
