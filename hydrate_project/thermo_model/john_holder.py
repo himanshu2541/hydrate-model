@@ -1,5 +1,9 @@
+import logging
+
 import numpy as np
 from scipy.integrate import quad
+
+log = logging.getLogger(__name__)
 
 
 class JohnHolderModel:
@@ -47,9 +51,9 @@ class JohnHolderModel:
         # print(f"Gas params (SI): a_g={a_g} m, sigma_g={sigma_g} m, eps_g={eps_g} J")
         # print(f"Water params (SI): a_w={a_w} m, sigma_w={sigma_w} m, eps_w={eps_w} J")
         # print(f"Calculated Kihara params: a={a} m, sigma={sigma} m, eps={eps} J")
-        # return a, sigma, eps
+        return a, sigma, eps
     
-        return a_g, sigma_g, eps_g
+        # return a_g, sigma_g, eps_g
 
 
     def _q_star_calculation(self, gas_props, struct_props, reference_props, Rc):
@@ -83,7 +87,7 @@ class JohnHolderModel:
     def calc_langmuir_constant(self, T, gas, cavity_type, structure):
         """Calculates the Langmuir constant C (m³/J) for a guest-cavity pair."""
         db = self.database
-        gas_props = db.GAS_DB[gas]
+        gas_props = db.GUEST_DB[gas]
         struct_props = db.STRUCTURE_DB[structure][cavity_type]
         reference_props = db.REFERENCE_PROPS[structure]
 
@@ -113,11 +117,9 @@ class JohnHolderModel:
             C_star = 0.0
 
         Q_star = self._q_star_calculation(gas_props, struct_props, reference_props, Rc)
-        # print(
-        #     f"[C* & Q*] Langmuir constant for {gas} in {structure} {cavity_type}: {C_star} m³/J, Q*={Q_star}"
-        # )
-        print(
-            f"[C] Final Langmuir constant for {gas} in {structure} {cavity_type}: C = {C_star * Q_star} m³/J"
+        log.debug(
+            "Final Langmuir constant for %s in %s %s: C = %s m^3/J",
+            gas, structure, cavity_type, C_star * Q_star,
         )
         return C_star * Q_star
 
@@ -135,13 +137,10 @@ class JohnHolderModel:
             C = C_vals[gas]
             theta = (C * f) / denominator
             occupancies[gas] = theta
-            # print(
-            #     f"[Occupancy] {gas} in {structure} {cavity_type}: C={C:.3e} m³/J, f={f:.3e} Pa, θ={theta:.4f}"
-            # )
-            
+
         return occupancies
 
-    def chemical_potential_difference_hydrate(self, T, fugacities, structure):
+    def chemical_potential_difference_hydrate(self, T, fugacities, structure, P=None):
         struct_props = self.database.STRUCTURE_DB[structure]
         occ_small = self.calc_cage_occupancy(T, fugacities, structure, "small")
         occ_large = self.calc_cage_occupancy(T, fugacities, structure, "large")
@@ -149,7 +148,10 @@ class JohnHolderModel:
         theta_s = sum(occ_small.values())
         theta_l = sum(occ_large.values())
 
-        print(f"[Occupancy Sums] Total small cage occupancy: θ_s={theta_s:.4f}, Total large cage occupancy: θ_l={theta_l:.4f}")
+        log.debug(
+            "Total small cage occupancy: theta_s=%.4f, total large cage occupancy: theta_l=%.4f",
+            theta_s, theta_l,
+        )
         val_s = max(1.0 - theta_s, 1e-15)
         val_l = max(1.0 - theta_l, 1e-15)
 
@@ -161,8 +163,9 @@ class JohnHolderModel:
                 + struct_props["large"]["nu"] * np.log(val_l)
             )
         )
-        print(
-            f"[Δμ_H] Chemical potential difference for {structure} at T={T} K: Δμ_H = {del_mu_H} J/mol"
+        log.debug(
+            "Chemical potential difference for %s at T=%s K: dMu_H = %s J/mol",
+            structure, T, del_mu_H,
         )
         return del_mu_H
 
@@ -188,12 +191,13 @@ class JohnHolderModel:
         heat_integral, _ = quad(heat_integrand, T0, T)
         vol_integral = (dV / (self.R * T)) * (P - self.database.P0)
 
-        rhs = dMu0 / (self.R * T0) - heat_integral + vol_integral + np.log(a_w + 1e-12)
+        rhs = dMu0 / (self.R * T0) - heat_integral + vol_integral - np.log(a_w + 1e-12)
 
         # rhs = dMu0 / (self.R * T0) + np.log(a_w + 1e-12)
 
         dMu_W = self.R * T * rhs
-        print(
-            f"[Δμ_W] Chemical potential difference for {structure} at T={T} K: Δμ_W = {dMu_W} J/mol"
+        log.debug(
+            "Chemical potential difference for %s at T=%s K: dMu_W = %s J/mol",
+            structure, T, dMu_W,
         )
         return dMu_W

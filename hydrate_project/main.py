@@ -18,7 +18,7 @@ Usage:
 import warnings
 warnings.filterwarnings("ignore")
 
-from hydrate_project.utils.launcher_app import LauncherApp
+from hydrate_project.ui.launcher.app import LauncherApp
 
 
 def main():

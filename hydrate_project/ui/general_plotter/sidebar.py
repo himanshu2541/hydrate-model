@@ -198,6 +198,9 @@ class Sidebar(ttk.Frame):
         results_dict: dict,
         on_update: Callable,
         on_save: Callable,
+        series_label: str = "EOS models",
+        default_row_vars: list[str] | None = None,
+        default_col_vars: list[str] | None = None,
         **kwargs,
     ):
         super().__init__(parent, style="Sidebar.TFrame", width=self.WIDTH, **kwargs)
@@ -207,6 +210,9 @@ class Sidebar(ttk.Frame):
         self._on_save = on_save
         self._columns = get_numeric_columns(results_dict)
         self._eos_names = list(results_dict.keys())
+        self._series_label = series_label
+        self._default_row_vars = default_row_vars or ["P_eq (MPa)"]
+        self._default_col_vars = default_col_vars or ["Theta_Small_CO2"]
 
         self._build_header()
         self._build_body()
@@ -282,7 +288,7 @@ class Sidebar(ttk.Frame):
             sec_row, text="Ctrl+click to select multiple", style="Muted.TLabel"
         ).pack(anchor=tk.W, pady=(0, 4))
         self._row_lb = _MultiListbox(
-            sec_row, self._columns, height=7, initial=["P_eq (MPa)"]
+            sec_row, self._columns, height=7, initial=self._default_row_vars
         )
         self._row_lb.pack(fill=tk.BOTH, expand=True)
 
@@ -295,7 +301,7 @@ class Sidebar(ttk.Frame):
             style="Muted.TLabel",
         ).pack(anchor=tk.W, pady=(0, 4))
         self._col_lb = _MultiListbox(
-            sec_col, self._columns, height=7, initial=["Theta_Small_CO2"]
+            sec_col, self._columns, height=7, initial=self._default_col_vars
         )
         self._col_lb.pack(fill=tk.BOTH, expand=True)
 
@@ -305,7 +311,7 @@ class Sidebar(ttk.Frame):
         self._comp_radio = _RadioGroup(
             sec_cmp,
             options=[
-                ("eos", f"Overlay all  ({len(self._eos_names)} EOS models)"),
+                ("eos", f"Overlay all  ({len(self._eos_names)} {self._series_label})"),
                 ("single", f"Single  ({self._eos_names[0]})"),
             ],
             default="eos",
@@ -346,8 +352,8 @@ class Sidebar(ttk.Frame):
 
     # ── public API ─────────────────────────────────────────────────────────
     def get_config(self) -> PlotConfig:
-        rows = self._row_lb.get_selected() or ["P_eq (MPa)"]
-        cols = self._col_lb.get_selected() or ["T (K)"]
+        rows = self._row_lb.get_selected() or self._default_row_vars
+        cols = self._col_lb.get_selected() or self._default_col_vars
         return PlotConfig(
             x_var=self._x_var.get() or "T (K)",
             row_vars=rows,

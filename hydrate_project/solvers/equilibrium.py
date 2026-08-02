@@ -1,7 +1,11 @@
+import logging
+
 import numpy as np
 import pandas as pd
 from scipy.optimize import root_scalar
 from ..water_activity_model.mod_unifac import ModifiedUnifac
+
+log = logging.getLogger(__name__)
 
 
 class EquilibriumSolver:
@@ -45,14 +49,7 @@ class EquilibriumSolver:
         try:
             unifac_pure = ModifiedUnifac({"H2O": 1.0}, self.database)
             x_gas_total = 0.0
-            mix_comps = {}
 
-            # Partial molar volumes at infinite dilution [m³/mol].
-            # These enter the Poynting correction for high-pressure solubility
-            # (Klauda & Sandler 2000, Eq. 19).
-            # CO2 : 32 mL/mol  (K&S 2000)
-            # H2  : 26.1 mL/mol (Brelvi & O'Connell 1972; ~40% larger than
-            #        the previously hard-coded 15 mL/mol)
             v_inf = {"CO2": 32.0e-6, "H2": 26.1e-6}
 
             for gas in list(f_dict.keys()):
@@ -62,51 +59,70 @@ class EquilibriumSolver:
                 )
                 x_gas = f_dict[gas] / (H_val_base * poynting_factor)
                 x_gas_total += x_gas
-                mix_comps[gas] = x_gas
 
+            # Calculate true mole fraction of water in the total liquid
             x_w = max(1.0 - x_gas_total - self.promoter_frac, 0.0)
-            mix_comps["H2O"] = x_w
 
-            if self.promoter_frac > 0 and self.promoter_name:
-                mix_comps[self.promoter_name] = self.promoter_frac
+            # Isolate the solvent (Water + Promoter) for UNIFAC
+            solvent_total = x_w + self.promoter_frac
+            unifac_comps = {}
+            if solvent_total > 0:
+                unifac_comps["H2O"] = x_w / solvent_total
+                if self.promoter_frac > 0 and self.promoter_name:
+                    unifac_comps[self.promoter_name] = (
+                        self.promoter_frac / solvent_total
+                    )
+            else:
+                unifac_comps["H2O"] = 1.0
 
-            unifac_mix = ModifiedUnifac(mix_comps, self.database)
+            # Calculate activity coefficient using ONLY the normalized solvent matrix
+            unifac_mix = ModifiedUnifac(unifac_comps, self.database)
             gamma_dict = unifac_mix.calc_gamma(T)
+
+            # The activity of water is the true mole fraction * activity coefficient
             aw_val = x_w * gamma_dict.get("H2O", 1.0)
 
-            # Promoter Fugacity via Clausius-Clapeyron vapor pressure
+            promoter_data = self.database.GUEST_DB.get(self.promoter_name, {})
             if self.promoter_frac > 0 and self.promoter_name:
-                delta_H_vap = 35000.0  # J/mol
-                P_sat = 9300.0 * np.exp(
-                    (delta_H_vap / self.database.R) * (1 / 293.15 - 1 / T)
+                delta_H_vap = promoter_data.get("delta_H_vap", 34700.0)
+                P_sat = promoter_data.get("P_sat_ref", 9300.0) * np.exp(
+                    (delta_H_vap / self.database.R) * (1 / promoter_data.get("T_sat_ref", 293.15) - 1 / T)
                 )
                 f_dict[self.promoter_name] = (
                     self.promoter_frac * gamma_dict.get(self.promoter_name, 1.0) * P_sat
                 )
 
-            return f_dict, phi_val, aw_val, gamma_dict.get("H2O", 1.0)
+            return f_dict, phi_val, aw_val, gamma_dict.get("H2O", 1.0), False
 
-        except Exception:
+        except Exception as exc:
+            log.warning(
+                "UNIFAC water-activity calculation failed (%s); falling back to a "
+                "crude Henry's-law approximation (magic constant 7.35e7 Pa). "
+                "Treat this point's results as low-confidence.",
+                exc,
+            )
             aw_val = max(
                 1.0
                 - sum(f_dict.get(g, 0) / 7.35e7 for g in f_dict.keys())
                 - self.promoter_frac,
                 0.0,
             )
-            return f_dict, phi_val, aw_val, 1.0
+            return f_dict, phi_val, aw_val, 1.0, True
 
     def _calculate_state(self, T, P, structure):
         """Calculate all thermodynamic properties at a given T, P."""
         if np.isnan(P) or P <= 0:
             return None
 
-        f_dict, phi_val, aw_val, gamma_val = self._get_liquid_and_fugacities(T, P)
+        f_dict, phi_val, aw_val, gamma_val, fallback_used = (
+            self._get_liquid_and_fugacities(T, P)
+        )
 
         mu_w = self.hydrate_model.chemical_potential_difference_water(
             T, P, aw_val, structure
         )
         mu_h = self.hydrate_model.chemical_potential_difference_hydrate(
-            T, f_dict, structure
+            T, f_dict, structure, P=P
         )
 
         occ_small = self.hydrate_model.calc_cage_occupancy(
@@ -119,23 +135,28 @@ class EquilibriumSolver:
         nu_small = self.database.STRUCTURE_DB[structure]["small"]["nu"]
         nu_large = self.database.STRUCTURE_DB[structure]["large"]["nu"]
 
+        all_guests = list(self.eos.gases)
+        if self.promoter_name and self.promoter_name not in all_guests:
+            all_guests.append(self.promoter_name)
+
         hydrate_moles = {}
         total_hydrate_moles = 0.0
-        for gas in self.eos.gases:
-            moles = nu_small * occ_small.get(gas, 0) + nu_large * occ_large.get(gas, 0)
-            hydrate_moles[gas] = moles
+        
+        # Iterate over all guests (including DIOX) to find the correct hydrate fractions
+        for guest in all_guests:
+            moles = nu_small * occ_small.get(guest, 0) + nu_large * occ_large.get(guest, 0)
+            hydrate_moles[guest] = moles
             total_hydrate_moles += moles
 
         z_hydrate = {
-            gas: (
-                hydrate_moles[gas] / total_hydrate_moles
+            guest: (
+                hydrate_moles[guest] / total_hydrate_moles
                 if total_hydrate_moles > 0
                 else 0.0
             )
-            for gas in self.eos.gases
+            for guest in all_guests
         }
 
-        # FIX: look up phi by gas name instead of hardcoding index 0 for CO2
         phi_by_gas = {gas: phi_val[i] for i, gas in enumerate(self.eos.gases)}
 
         try:
@@ -146,19 +167,23 @@ class EquilibriumSolver:
         state = {
             "P_eq (MPa)": P / 1e6,
             "Z": Z_val,
+            "Fallback_Used": fallback_used,
             "a_w": aw_val,
             "gamma_w": gamma_val,
             "Delta_Mu_w": mu_w,
             "Delta_Mu_H": mu_h,
         }
 
-        # Dynamically store fugacity and phi for each gas
-        for gas in self.eos.gases:
-            state[f"f_{gas} (MPa)"] = f_dict.get(gas, 0) / 1e6
-            state[f"Phi_{gas}"] = phi_by_gas.get(gas, 1.0)
-            state[f"Theta_Small_{gas}"] = occ_small.get(gas, 0)
-            state[f"Theta_Large_{gas}"] = occ_large.get(gas, 0)
-            state[f"z_Hyd_{gas}"] = z_hydrate[gas]
+        for guest in all_guests:
+            state[f"f_{guest} (MPa)"] = f_dict.get(guest, 0) / 1e6
+            
+            # Fugacity coefficients (Phi) are only tracked for EOS gases. 
+            # We set NaN for liquid promoters like DIOX.
+            state[f"Phi_{guest}"] = phi_by_gas.get(guest, "nan")
+            
+            state[f"Theta_Small_{guest}"] = occ_small.get(guest, 0)
+            state[f"Theta_Large_{guest}"] = occ_large.get(guest, 0)
+            state[f"z_Hyd_{guest}"] = z_hydrate.get(guest, 0)
 
         # Calculate Ideal Separation Factor (Enrichment Ratio)
         if len(self.eos.gases) >= 2:
@@ -171,7 +196,7 @@ class EquilibriumSolver:
                 # Defined as: y_gas_hydrate / y_gas_vapor
                 state[f"SF_{gas1}_{gas2}"] = z_hydrate[gas1] / y1
             else:
-                state[f"SF_{gas1}_{gas2}"] = np.nan
+                state[f"SF_{gas1}_{gas2}"] = "nan"
 
         # Optional: Track the ideal separation factor for EVERY gas individually
         for i, gas in enumerate(self.eos.gases):
@@ -179,7 +204,7 @@ class EquilibriumSolver:
             if y_gas > 0:
                 state[f"Ideal_SF_{gas}"] = z_hydrate[gas] / y_gas
             else:
-                state[f"Ideal_SF_{gas}"] = np.nan
+                state[f"Ideal_SF_{gas}"] = "nan"
 
         return state
 
@@ -194,13 +219,13 @@ class EquilibriumSolver:
             if P <= 0:
                 return 1e6 - P
 
-            f_dict, _, aw_val, _ = self._get_liquid_and_fugacities(T, P)
+            f_dict, _, aw_val, _, _ = self._get_liquid_and_fugacities(T, P)
 
             mu_w = self.hydrate_model.chemical_potential_difference_water(
                 T, P, aw_val, structure
             )
             mu_h = self.hydrate_model.chemical_potential_difference_hydrate(
-                T, f_dict, structure
+                T, f_dict, structure, P=P
             )
             return mu_w - mu_h
 
@@ -219,7 +244,7 @@ class EquilibriumSolver:
                 )
             elif method == "bisect":
                 sol = root_scalar(
-                    objective, bracket=[1e5, 50e6], method="bisect", xtol=1.0
+                    objective, bracket=[1, 100e6], method="bisect", xtol=1.0
                 )
             else:
                 raise ValueError(f"Unknown solver method: {method}")
@@ -227,7 +252,8 @@ class EquilibriumSolver:
             if sol.converged:
                 return self._calculate_state(T, sol.root, structure)
             return None
-        except Exception:
+        except Exception as e:
+            log.debug("Solver crashed at %s K: %r", T, e)
             return None
 
     def find_optimum_structure(
@@ -247,7 +273,7 @@ class EquilibriumSolver:
             P_sI = state_sI["P_eq (MPa)"] if state_sI else np.nan
             P_sII = state_sII["P_eq (MPa)"] if state_sII else np.nan
 
-            print(f"T={T:.2f} K: P_sI={P_sI:.3f} MPa, P_sII={P_sII:.3f} MPa")
+            log.info("T=%.2f K: P_sI=%.3f MPa, P_sII=%.3f MPa", T, P_sI, P_sII)
 
             opt_struct = None
             opt_state = None

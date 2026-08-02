@@ -5,7 +5,7 @@ Interactive grid-plot builder for hydrate project results.
 
 Quick start
 -----------
-    from hydrate_project.utils.general_plotter import GeneralPlotter
+    from hydrate_project.ui.general_plotter import GeneralPlotter
 
     plotter = GeneralPlotter(all_results, experimental_data)
     plotter.show()              # launch GUI

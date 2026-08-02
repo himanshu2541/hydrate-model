@@ -10,3 +10,7 @@ wheels/
 .venv
 
 hydrate_cache.db
+validation_report.md
+uv.lock
+.pytest_cache/
+.claude
