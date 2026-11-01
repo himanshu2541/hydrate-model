@@ -1,0 +1,10 @@
+INPUT: Two_Stage_Hydrate_Capture_MVP.inm
+MODNAME: apmain
+RUNID: Two_Stage_Hydrate_Capture_MVP
+NEW_RUNID: Two_Stage_Hydrate_Capture_MVP
+OLD_RUNID: Two_Stage_Hydrate_Capture_MVP
+PDF: Two_Stage_Hydrate_Capture_MVP.appdf
+USERNAME: hskus
+XMOD: C:\Program Files\AspenTech\Aspen Plus V14.0\Engine\xeq\apmain
+SPONLY:
+DBCONN: _2714ptm.ads

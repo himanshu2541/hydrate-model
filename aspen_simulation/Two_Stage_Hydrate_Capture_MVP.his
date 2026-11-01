@@ -1,0 +1,925 @@
+
+ + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + +
+ + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + +
+ + +                                                                         + +
+ + +                      ASPEN PLUS CALCULATION HISTORY                     + +
+ + +                                                                         + +
+ + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + +
+ + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + + +
+
+ ASPEN PLUS IS A TRADEMARK OF           HOTLINE:
+ ASPEN TECHNOLOGY, INC.                 U.S.A. 888/996-7100
+ 781/221-6400                           EUROPE (44) 1189-226555
+
+ PLATFORM: WIN-X64                                       NOVEMBER 1, 2026    
+ VERSION: 40.0   Build 359                               SUNDAY      
+ INSTALLATION:                                           1:27:17 P.M.        
+
+ THIS COPY OF ASPEN PLUS LICENSED TO                                 
+
+
+      ASPEN PLUS (R) IS A PROPRIETARY PRODUCT OF ASPEN TECHNOLOGY, INC.
+      (ASPENTECH), AND MAY BE USED ONLY UNDER AGREEMENT WITH ASPENTECH.
+      RESTRICTED RIGHTS LEGEND:  USE, REPRODUCTION, OR DISCLOSURE BY THE
+      U.S. GOVERNMENT IS SUBJECT TO RESTRICTIONS SET FORTH IN 
+      (i) FAR 52.227-14, Alt. III, (ii) FAR 52.227-19, (iii) DFARS 
+      252.227-7013(c)(1)(ii), or (iv) THE ACCOMPANYING LICENSE AGREEMENT,
+      AS APPLICABLE. FOR PURPOSES OF THE FAR, THIS SOFTWARE SHALL BE DEEMED
+      TO BE "UNPUBLISHED" AND LICENSED WITH DISCLOSURE PROHIBITIONS.
+      CONTRACTOR/SUBCONTRACTOR: ASPEN TECHNOLOGY, INC. 20 CROSBY DRIVE,
+      BEDFORD, MA 01730.
+ *** INPUT SUMMARY ***
+
+ >>CURRENT RUN
+
+   ORIGINAL RUN                           NOVEMBER 1, 2026    
+   1:27:17 P.M.                           SUNDAY      
+   INPUT FILE: _2714ptm.inm
+   RUN ID : _2714ptm
+          1    ;
+          2    ;Input file created by Aspen Plus Rel. 40.0 at 13:27:16 Sun Nov 1, 2026
+          3    ;Directory C:\Users\hskus\Documents\MTP\BTP-II\hydrate_project  Runid TWO_STAGE_HYDRATE_CAPTURE_MVP
+          4    ;
+          5
+          6
+          7    DYNAMICS
+          8        DYNAMICS RESULTS=ON
+          9
+         10    TITLE 'HYDRATE TWO STAGE SEPARATION'
+         11
+         12    IN-UNITS MET VOLUME-FLOW='cum/hr' ENTHALPY-FLO='Gcal/hr'  &
+         13            HEAT-TRANS-C='kcal/hr-sqm-C' PRESSURE=bar TEMPERATURE=C  &
+         14            PDROP=atm
+         15
+         16    DEF-STREAMS CONVEN ALL
+         17
+         18    MODEL-OPTION
+         19
+         20    DATABANKS 'APV140 PURE40' / 'APV140 AQUEOUS' / 'APV140 SOLIDS' &
+         21             / 'APV140 INORGANIC' / NOASPENPCD
+         22
+         23    PROP-SOURCES 'APV140 PURE40' / 'APV140 AQUEOUS' /  &
+         24            'APV140 SOLIDS' / 'APV140 INORGANIC'
+         25
+         26    COMPONENTS
+         27        CO2 CO2 /
+         28        H2 H2 /
+         29        H2O H2O /
+         30        DIOXANE C4H8O2-1
+         31
+         32    SOLVE
+         33        RUN-MODE MODE=SIM
+         34
+         35    FLOWSHEET
+         36        BLOCK COMP1 IN=S1 OUT=S2
+         37        BLOCK CHILL1 IN=S2 OUT=S3
+         38        BLOCK MIX1 IN=S3 S11 OUT=S4
+         39        BLOCK FORM1 IN=S4 OUT=S5 S6
+         40        BLOCK VALV1 IN=S6 OUT=S7
+         41        BLOCK DISS1 IN=S7 OUT=S8 S9
+         42        BLOCK PUMP1 IN=S9 OUT=S10
+         43        BLOCK CHILL2 IN=S10 OUT=S11
+         44        BLOCK COMP2 IN=S8 OUT=S12
+         45        BLOCK CHILL3 IN=S12 OUT=S13
+         46        BLOCK MIX2 IN=S13 S21 OUT=S14
+         47        BLOCK FORM2 IN=S14 OUT=S15 S16
+         48        BLOCK VALV2 IN=S16 OUT=S17
+         49        BLOCK DISS2 IN=S17 OUT=S18 S19
+         50        BLOCK PUMP2 IN=S19 OUT=S20
+         51        BLOCK CHILL4 IN=S20 OUT=S21
+         52
+         53    PROPERTIES RK-SOAVE
+         54
+         55    STREAM S1
+         56        SUBSTREAM MIXED TEMP=30. PRES=25. MOLE-FLOW=100.
+         57        MOLE-FLOW CO2 40. / H2 60. / H2O 0. / DIOXANE 0.
+         58
+         59    STREAM S11
+         60        SUBSTREAM MIXED TEMP=1. PRES=24.8 MOLE-FLOW=1200.
+         61        MOLE-FLOW CO2 0. / H2 0. / H2O 1133.28 / DIOXANE  &
+         62            66.72
+         63
+         64    STREAM S21
+         65        SUBSTREAM MIXED TEMP=1. PRES=24.8 MOLE-FLOW=400.
+         66        MOLE-FLOW CO2 0. / H2 0. / H2O 377.76 / DIOXANE 22.24
+         67
+         68    BLOCK MIX1 MIXER
+         69        PARAM
+         70
+         71    BLOCK MIX2 MIXER
+         72        PARAM
+         73
+         74    BLOCK FORM1 SEP
+         75        FRAC STREAM=S5 SUBSTREAM=MIXED COMPS=CO2 H2 H2O DIOXANE  &
+         76            FRACS=0.28 0.9927 0.0001 0.0001
+         77
+         78    BLOCK FORM2 SEP
+         79        FRAC STREAM=S15 SUBSTREAM=MIXED COMPS=CO2 H2 H2O DIOXANE  &
+         80            FRACS=0.12 0.9 0.0001 0.0001
+         81
+         82    BLOCK CHILL1 HEATER
+         83        PARAM TEMP=1. PRES=24.8 DPPARMOPT=NO
+         84
+         85    BLOCK CHILL2 HEATER
+         86        PARAM TEMP=1. PRES=24.8 DPPARMOPT=NO
+         87
+         88    BLOCK CHILL3 HEATER
+         89        PARAM TEMP=1. PRES=24.8 DPPARMOPT=NO
+         90
+         91    BLOCK CHILL4 HEATER
+         92        PARAM TEMP=1. PRES=24.8 DPPARMOPT=NO
+         93
+         94    BLOCK DISS1 FLASH2
+         95        PARAM TEMP=12. PRES=4.
+         96
+         97    BLOCK DISS2 FLASH2
+         98        PARAM TEMP=12. PRES=4.
+         99
+        100    BLOCK PUMP1 PUMP
+        101        PARAM PRES=25. EFF=0.7
+        102
+        103    BLOCK PUMP2 PUMP
+        104        PARAM PRES=25. EFF=0.7
+        105
+        106    BLOCK COMP1 COMPR
+        107        PARAM TYPE=ISENTROPIC PRES=25. SB-MAXIT=30 SB-TOL=0.0001
+        108
+        109    BLOCK COMP2 COMPR
+        110        PARAM TYPE=ISENTROPIC PRES=25. SB-MAXIT=30 SB-TOL=0.0001
+        111
+        112    BLOCK VALV1 VALVE
+        113        PARAM P-OUT=4.
+        114
+        115    BLOCK VALV2 VALVE
+        116        PARAM P-OUT=4.
+        117
+        118    EO-CONV-OPTI
+        119
+        120    CONV-OPTIONS
+        121        PARAM TOL=0.001
+        122        WEGSTEIN MAXIT=100
+        123
+        124    STREAM-REPOR MOLEFLOW
+        125    ;
+        126    ;
+        127    ;
+        128    ;
+        129    ;
+ *** INPUT TRANSLATOR MESSAGES ***
+
+  *** THIS RUN USES THE PROPERTIES ENTERPRISE DATABASE ***
+      SQLLOCALDB.APESV140 : (DATAVERSION - 40.0.0.13)                         
+      SQLLOCALDB.APV140 : (DATAVERSION - 40.0.0.13)                           
+      SQLLOCALDB.FACTV140 : (DATAVERSION - 40.0.0.12)                         
+      SQLLOCALDB.NISTV140 : (DATAVERSION - 40.0.0.12)                         
+
+      INFORMATION                                              (GTDATA.3)       
+      BINARY PARAMETERS RKSKBV (DATA SET 1) FOR MODELS ESRKS/ESRKSTD            
+      ARE RETRIEVED FROM EOS DATABANK. DATABANK NAME = EOS-LIT.                 
+ 
+ 
+
+ PDF updated                                                                      TIME =      1.33
+
+ *** CALCULATION TRACE ***
+
+ HYDRATE TWO STAGE SEPARATION                                    
+
+ *** FLOWSHEET ANALYSIS MESSAGES ***
+
+ FLOWSHEET CONNECTIVITY BY STREAMS       
+
+   STREAM     SOURCE     DEST           STREAM     SOURCE     DEST
+   S1         ----       COMP1          S2         COMP1      CHILL1  
+   S3         CHILL1     MIX1           S4         MIX1       FORM1   
+   S5         FORM1      ----           S6         FORM1      VALV1   
+   S7         VALV1      DISS1          S8         DISS1      COMP2   
+   S9         DISS1      PUMP1          S10        PUMP1      CHILL2  
+   S11        CHILL2     MIX1           S12        COMP2      CHILL3  
+   S13        CHILL3     MIX2           S14        MIX2       FORM2   
+   S15        FORM2      ----           S16        FORM2      VALV2   
+   S17        VALV2      DISS2          S18        DISS2      ----    
+   S19        DISS2      PUMP2          S20        PUMP2      CHILL4  
+   S21        CHILL4     MIX2                                         
+
+ FLOWSHEET CONNECTIVITY BY BLOCKS        
+
+   BLOCK        INLETS                         OUTLETS
+   COMP1        S1                             S2                          
+   CHILL1       S2                             S3                          
+   MIX1         S3 S11                         S4                          
+   FORM1        S4                             S5 S6                       
+   VALV1        S6                             S7                          
+   DISS1        S7                             S8 S9                       
+   PUMP1        S9                             S10                         
+   CHILL2       S10                            S11                         
+   COMP2        S8                             S12                         
+   CHILL3       S12                            S13                         
+   MIX2         S13 S21                        S14                         
+   FORM2        S14                            S15 S16                     
+   VALV2        S16                            S17                         
+   DISS2        S17                            S18 S19                     
+   PUMP2        S19                            S20                         
+   CHILL4       S20                            S21                         
+
+      BLOCK $OLVER01 (METHOD: WEGSTEIN) HAS BEEN DEFINED TO CONVERGE
+               STREAMS: S11
+
+      BLOCK $OLVER02 (METHOD: WEGSTEIN) HAS BEEN DEFINED TO CONVERGE
+               STREAMS: S21
+
+      COMPUTATION ORDER FOR THE FLOWSHEET IS:
+      COMP1 CHILL1 
+      $OLVER01 MIX1 FORM1 VALV1 DISS1 PUMP1 CHILL2 
+      (RETURN $OLVER01) 
+      COMP2 CHILL3 
+      $OLVER02 MIX2 FORM2 VALV2 DISS2 PUMP2 CHILL4 
+      (RETURN $OLVER02) 
+
+Calculations begin                                                              time      0.25
+
+
+ SIMULATION CALCULATIONS BEGIN                                                    TIME =      0.25
+
+      ENTHALPY CALCULATION FOR INLET STREAM S1 OF BLOCK COMP1                     TIME =      0.25
+      KODE = 2  NTRIAL =   5  T = 303.1500  P = 2.500000E+06  V =  1.00000      Q =  0.00000    
+
+      UOS BLOCK COMP1    MODEL: COMPR                                             TIME =      0.25
+
+  *   WARNING WHILE EXECUTING UNIT OPERATIONS BLOCK: "COMP1" (MODEL: "COMPR")   
+                                                               (CMSTIN.2)       
+      IMPROPER OUTLET PRESSURE SPECIFIED FOR THE GIVEN UNIT                     
+      INPUT PRESSURE = (0.2500E+07)  OUTPUT PRESSURE =  (0.2500E+07)            
+ 
+      SKIPPING REST OF THE BLOCK CALCULATIONS AND INLET IS COPIED TO OUTLET.
+
+      UOS BLOCK CHILL1   MODEL: HEATER                                            TIME =      0.25
+      KODE = 2  NTRIAL =   7  T = 274.1500  P = 2.480000E+06  V =  1.00000      Q = -27056.2    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.25
+      ITER   0 For Tear Streams: S11
+
+      ENTHALPY CALCULATION FOR INLET STREAM S11 OF BLOCK MIX1                     TIME =      0.25
+      KODE = 2  NTRIAL =   4  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+      UOS BLOCK MIX1     MODEL: MIXER                                             TIME =      0.25
+      KODE = 1  NTRIAL =  12  T = 273.9810  P = 2.480000E+06  V = 7.600317E-02  Q =  0.00000    
+
+      UOS BLOCK FORM1    MODEL: SEP                                               TIME =      0.25
+      ---FLASH OUTLET STREAM S5      :
+      KODE = 2  NTRIAL =   8  T = 273.9810  P = 2.480000E+06  V = 0.998588      Q =  0.00000    
+      ---FLASH OUTLET STREAM S6      :
+      KODE = 2  NTRIAL =   5  T = 273.9810  P = 2.480000E+06  V = 2.017378E-02  Q =  0.00000    
+
+      UOS BLOCK VALV1    MODEL: VALVE                                             TIME =      0.25
+      KODE = 1  NTRIAL =  10  T = 274.1228  P =  400000.      V = 2.392420E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS1    MODEL: FLASH2                                            TIME =      0.25
+      KODE = 2  NTRIAL =   5  T = 285.1500  P =  400000.      V = 2.440782E-02  Q =  346891.    
+
+      UOS BLOCK PUMP1    MODEL: PUMP                                              TIME =      0.25
+      VOL-FLOW   =  0.7403E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1555E+05 , BRAKE PWR  =  0.2221E+05 , ELEC PWR   =  0.2221E+05
+
+      UOS BLOCK CHILL2   MODEL: HEATER                                            TIME =      0.25
+      KODE = 2  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -344380.    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.25
+      ITER   1 For Tear Streams: S11
+
+      --FLASH TEAR STREAM S11     
+      NO. TEMP ITER =    7     TEMP =  274.150    
+      KODE = 1  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER01 ITER    1:   3 VARS NOT CONVERGED, MAX ERR/TOL      1000.0        TIME =      0.27
+
+      UOS BLOCK MIX1     MODEL: MIXER                                             TIME =      0.29
+      KODE = 1  NTRIAL =   5  T = 273.9765  P = 2.480000E+06  V = 7.685533E-02  Q =  0.00000    
+
+      UOS BLOCK FORM1    MODEL: SEP                                               TIME =      0.29
+      ---FLASH OUTLET STREAM S5      :
+      KODE = 2  NTRIAL =   2  T = 273.9765  P = 2.480000E+06  V = 0.998594      Q =  0.00000    
+      ---FLASH OUTLET STREAM S6      :
+      KODE = 2  NTRIAL =   4  T = 273.9765  P = 2.480000E+06  V = 2.095680E-02  Q =  0.00000    
+
+      UOS BLOCK VALV1    MODEL: VALVE                                             TIME =      0.29
+      KODE = 1  NTRIAL =  11  T = 274.0929  P =  400000.      V = 2.460521E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS1    MODEL: FLASH2                                            TIME =      0.29
+      KODE = 2  NTRIAL =   4  T = 285.1500  P =  400000.      V = 2.515090E-02  Q =  347300.    
+
+      UOS BLOCK PUMP1    MODEL: PUMP                                              TIME =      0.29
+      VOL-FLOW   =  0.7354E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1544E+05 , BRAKE PWR  =  0.2206E+05 , ELEC PWR   =  0.2206E+05
+
+      UOS BLOCK CHILL2   MODEL: HEATER                                            TIME =      0.29
+      KODE = 2  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -343283.    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.29
+      ITER   2 For Tear Streams: S11
+
+      --FLASH TEAR STREAM S11     
+      NO. TEMP ITER =    7     TEMP =  274.150    
+      KODE = 1  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER01 ITER    2:   4 VARS NOT CONVERGED, MAX ERR/TOL     -51.939        TIME =      0.29
+
+      UOS BLOCK MIX1     MODEL: MIXER                                             TIME =      0.29
+      KODE = 1  NTRIAL =   5  T = 273.9605  P = 2.480000E+06  V = 7.711336E-02  Q =  0.00000    
+
+      UOS BLOCK FORM1    MODEL: SEP                                               TIME =      0.29
+      ---FLASH OUTLET STREAM S5      :
+      KODE = 2  NTRIAL =   2  T = 273.9605  P = 2.480000E+06  V = 0.998594      Q =  0.00000    
+      ---FLASH OUTLET STREAM S6      :
+      KODE = 2  NTRIAL =   4  T = 273.9605  P = 2.480000E+06  V = 2.125181E-02  Q =  0.00000    
+
+      UOS BLOCK VALV1    MODEL: VALVE                                             TIME =      0.29
+      KODE = 1  NTRIAL =  12  T = 274.0572  P =  400000.      V = 2.478360E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS1    MODEL: FLASH2                                            TIME =      0.29
+      KODE = 2  NTRIAL =   4  T = 285.1500  P =  400000.      V = 2.539710E-02  Q =  347677.    
+
+      UOS BLOCK PUMP1    MODEL: PUMP                                              TIME =      0.29
+      VOL-FLOW   =  0.7299E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1533E+05 , BRAKE PWR  =  0.2190E+05 , ELEC PWR   =  0.2190E+05
+
+      UOS BLOCK CHILL2   MODEL: HEATER                                            TIME =      0.29
+      KODE = 2  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -342050.    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.29
+      ITER   3 For Tear Streams: S11
+
+      --FLASH TEAR STREAM S11     
+      NO. TEMP ITER =    7     TEMP =  274.150    
+      KODE = 1  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER01 ITER    3:   4 VARS NOT CONVERGED, MAX ERR/TOL     -60.813        TIME =      0.30
+
+      UOS BLOCK MIX1     MODEL: MIXER                                             TIME =      0.30
+      KODE = 1  NTRIAL =   5  T = 273.9400  P = 2.480000E+06  V = 7.742330E-02  Q =  0.00000    
+
+      UOS BLOCK FORM1    MODEL: SEP                                               TIME =      0.30
+      ---FLASH OUTLET STREAM S5      :
+      KODE = 2  NTRIAL =   2  T = 273.9400  P = 2.480000E+06  V = 0.998594      Q =  0.00000    
+      ---FLASH OUTLET STREAM S6      :
+      KODE = 2  NTRIAL =   4  T = 273.9400  P = 2.480000E+06  V = 2.160257E-02  Q =  0.00000    
+
+      UOS BLOCK VALV1    MODEL: VALVE                                             TIME =      0.30
+      KODE = 1  NTRIAL =  12  T = 274.0099  P =  400000.      V = 2.501346E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS1    MODEL: FLASH2                                            TIME =      0.30
+      KODE = 2  NTRIAL =   4  T = 285.1500  P =  400000.      V = 2.572394E-02  Q =  348396.    
+
+      UOS BLOCK PUMP1    MODEL: PUMP                                              TIME =      0.30
+      VOL-FLOW   =  0.7235E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1519E+05 , BRAKE PWR  =  0.2171E+05 , ELEC PWR   =  0.2171E+05
+
+      UOS BLOCK CHILL2   MODEL: HEATER                                            TIME =      0.30
+      KODE = 2  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -340629.    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.30
+      ITER   4 For Tear Streams: S11
+
+      --FLASH TEAR STREAM S11     
+      NO. TEMP ITER =    6     TEMP =  274.150    
+      KODE = 1  NTRIAL =   6  T = 274.1501  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER01 ITER    4:   4 VARS NOT CONVERGED, MAX ERR/TOL     -72.917        TIME =      0.30
+
+      UOS BLOCK MIX1     MODEL: MIXER                                             TIME =      0.30
+      KODE = 1  NTRIAL =   5  T = 273.9122  P = 2.480000E+06  V = 7.781561E-02  Q =  0.00000    
+
+      UOS BLOCK FORM1    MODEL: SEP                                               TIME =      0.30
+      ---FLASH OUTLET STREAM S5      :
+      KODE = 2  NTRIAL =   2  T = 273.9122  P = 2.480000E+06  V = 0.998593      Q =  0.00000    
+      ---FLASH OUTLET STREAM S6      :
+      KODE = 2  NTRIAL =   5  T = 273.9122  P = 2.480000E+06  V = 2.204960E-02  Q =  0.00000    
+
+      UOS BLOCK VALV1    MODEL: VALVE                                             TIME =      0.30
+      KODE = 1  NTRIAL =  12  T = 273.9434  P =  400000.      V = 2.533022E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS1    MODEL: FLASH2                                            TIME =      0.30
+      KODE = 2  NTRIAL =   4  T = 285.1500  P =  400000.      V = 2.619395E-02  Q =  349751.    
+
+      UOS BLOCK PUMP1    MODEL: PUMP                                              TIME =      0.30
+      VOL-FLOW   =  0.7159E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1503E+05 , BRAKE PWR  =  0.2148E+05 , ELEC PWR   =  0.2148E+05
+
+      UOS BLOCK CHILL2   MODEL: HEATER                                            TIME =      0.30
+      KODE = 2  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -338926.    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.30
+      ITER   5 For Tear Streams: S11
+
+      --FLASH TEAR STREAM S11     
+      NO. TEMP ITER =    6     TEMP =  274.150    
+      KODE = 1  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER01 ITER    5:   4 VARS NOT CONVERGED, MAX ERR/TOL     -91.604        TIME =      0.30
+
+      UOS BLOCK MIX1     MODEL: MIXER                                             TIME =      0.30
+      KODE = 1  NTRIAL =   5  T = 273.8709  P = 2.480000E+06  V = 7.835715E-02  Q =  0.00000    
+
+      UOS BLOCK FORM1    MODEL: SEP                                               TIME =      0.30
+      ---FLASH OUTLET STREAM S5      :
+      KODE = 2  NTRIAL =   2  T = 273.8709  P = 2.480000E+06  V = 0.998593      Q =  0.00000    
+      ---FLASH OUTLET STREAM S6      :
+      KODE = 2  NTRIAL =   6  T = 273.8709  P = 2.480000E+06  V = 2.272213E-02  Q =  0.00000    
+
+      UOS BLOCK VALV1    MODEL: VALVE                                             TIME =      0.30
+      KODE = 1  NTRIAL =  12  T = 273.8391  P =  400000.      V = 2.581710E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS1    MODEL: FLASH2                                            TIME =      0.30
+      KODE = 2  NTRIAL =   5  T = 285.1500  P =  400000.      V = 2.697250E-02  Q =  352546.    
+
+      UOS BLOCK PUMP1    MODEL: PUMP                                              TIME =      0.30
+      VOL-FLOW   =  0.7059E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1482E+05 , BRAKE PWR  =  0.2118E+05 , ELEC PWR   =  0.2118E+05
+
+      UOS BLOCK CHILL2   MODEL: HEATER                                            TIME =      0.30
+      KODE = 2  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -336740.    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.30
+      ITER   6 For Tear Streams: S11
+
+      --FLASH TEAR STREAM S11     
+      NO. TEMP ITER =    6     TEMP =  274.150    
+      KODE = 1  NTRIAL =   5  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER01 ITER    6:   4 VARS NOT CONVERGED, MAX ERR/TOL     -125.07        TIME =      0.30
+
+      UOS BLOCK MIX1     MODEL: MIXER                                             TIME =      0.30
+      KODE = 1  NTRIAL =   6  T = 273.7975  P = 2.480000E+06  V = 7.924980E-02  Q =  0.00000    
+
+      UOS BLOCK FORM1    MODEL: SEP                                               TIME =      0.30
+      ---FLASH OUTLET STREAM S5      :
+      KODE = 2  NTRIAL =   2  T = 273.7975  P = 2.480000E+06  V = 0.998591      Q =  0.00000    
+      ---FLASH OUTLET STREAM S6      :
+      KODE = 2  NTRIAL =  10  T = 273.7975  P = 2.480000E+06  V = 2.646703E-02  Q =  0.00000    
+
+  **  ERROR WHILE EXECUTING UNIT OPERATIONS BLOCK: "FORM1" (MODEL: "SEP")       
+                                                               (USP03.1)        
+      FLASH RESULTS ARE WITHIN TOLERANCE, BUT MAY BE UNSATISFACTORY BECAUSE     
+      EXTRAPOLATED EOS VAPOR VOLUME ROOT WAS USED FOR PROPERTY CALCULATIONS     
+      (T= 273.7975 K, P= 2.4800D+06 Pa). PROBLEM OCCURRED IN FLASH OF OUTLET    
+      STREAM "S6"                                                               
+
+      UOS BLOCK VALV1    MODEL: VALVE                                             TIME =      0.30
+      KODE = 1  NTRIAL =  12  T = 273.6102  P =  400000.      V = 2.675033E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS1    MODEL: FLASH2                                            TIME =      0.30
+      KODE = 2  NTRIAL =   6  T = 285.1500  P =  400000.      V = 2.883742E-02  Q =  361251.    
+
+      UOS BLOCK PUMP1    MODEL: PUMP                                              TIME =      0.30
+      VOL-FLOW   =  0.6903E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1450E+05 , BRAKE PWR  =  0.2071E+05 , ELEC PWR   =  0.2071E+05
+
+      UOS BLOCK CHILL2   MODEL: HEATER                                            TIME =      0.30
+      KODE = 2  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -333338.    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.30
+      ITER   7 For Tear Streams: S11
+
+      --FLASH TEAR STREAM S11     
+      NO. TEMP ITER =    6     TEMP =  274.150    
+      KODE = 1  NTRIAL =   5  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER01 ITER    7:   4 VARS NOT CONVERGED, MAX ERR/TOL     -211.87        TIME =      0.31
+
+      UOS BLOCK MIX1     MODEL: MIXER                                             TIME =      0.31
+      KODE = 1  NTRIAL =   7  T = 273.5258  P = 2.480000E+06  V = 8.234912E-02  Q =  0.00000    
+
+      UOS BLOCK FORM1    MODEL: SEP                                               TIME =      0.31
+      ---FLASH OUTLET STREAM S5      :
+      KODE = 2  NTRIAL =   2  T = 273.5258  P = 2.480000E+06  V = 0.998587      Q =  0.00000    
+      ---FLASH OUTLET STREAM S6      :
+      KODE = 2  NTRIAL =   5  T = 273.5258  P = 2.480000E+06  V = 2.939533E-02  Q =  0.00000    
+
+  **  ERROR WHILE EXECUTING UNIT OPERATIONS BLOCK: "FORM1" (MODEL: "SEP")       
+                                                               (USP03.1)        
+      FLASH RESULTS ARE WITHIN TOLERANCE, BUT MAY BE UNSATISFACTORY BECAUSE     
+      EXTRAPOLATED EOS VAPOR VOLUME ROOT WAS USED FOR PROPERTY CALCULATIONS     
+      (T= 273.5258 K, P= 2.4800D+06 Pa). PROBLEM OCCURRED IN FLASH OF OUTLET    
+      STREAM "S6"                                                               
+
+      UOS BLOCK VALV1    MODEL: VALVE                                             TIME =      0.31
+      KODE = 1  NTRIAL =  24  T = 271.9110  P =  400000.      V = 6.290136E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS1    MODEL: FLASH2                                            TIME =      0.31
+      KODE = 2  NTRIAL =  10  T = 285.1500  P =  400000.      V = 6.290530E-02  Q =  395564.    
+
+      UOS BLOCK PUMP1    MODEL: PUMP                                              TIME =      0.31
+      VOL-FLOW   =  0.5644E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1185E+05 , BRAKE PWR  =  0.1693E+05 , ELEC PWR   =  0.1693E+05
+
+      UOS BLOCK CHILL2   MODEL: HEATER                                            TIME =      0.31
+      KODE = 2  NTRIAL =   5  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -307020.    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.31
+      ITER   8 For Tear Streams: S11
+
+      --FLASH TEAR STREAM S11     
+      NO. TEMP ITER =    6     TEMP =  274.150    
+      KODE = 1  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER01 ITER    8:   4 VARS NOT CONVERGED, MAX ERR/TOL     -986.77        TIME =      0.31
+
+      UOS BLOCK MIX1     MODEL: MIXER                                             TIME =      0.31
+      KODE = 1  NTRIAL =   6  T = 274.1742  P = 2.480000E+06  V = 8.156781E-02  Q =  0.00000    
+
+      UOS BLOCK FORM1    MODEL: SEP                                               TIME =      0.31
+      ---FLASH OUTLET STREAM S5      :
+      KODE = 2  NTRIAL =   3  T = 274.1742  P = 2.480000E+06  V = 0.998594      Q =  0.00000    
+      ---FLASH OUTLET STREAM S6      :
+      KODE = 2  NTRIAL =   4  T = 274.1742  P = 2.480000E+06  V = 2.543454E-02  Q =  0.00000    
+
+      UOS BLOCK VALV1    MODEL: VALVE                                             TIME =      0.31
+      KODE = 1  NTRIAL =  11  T = 274.2542  P =  400000.      V = 2.568881E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS1    MODEL: FLASH2                                            TIME =      0.31
+      KODE = 2  NTRIAL =   2  T = 285.1500  P =  400000.      V = 2.571386E-02  Q =  303643.    
+
+      UOS BLOCK PUMP1    MODEL: PUMP                                              TIME =      0.31
+      VOL-FLOW   =  0.5627E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1182E+05 , BRAKE PWR  =  0.1688E+05 , ELEC PWR   =  0.1688E+05
+
+      UOS BLOCK CHILL2   MODEL: HEATER                                            TIME =      0.31
+      KODE = 2  NTRIAL =   5  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -306650.    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.31
+      ITER   9 For Tear Streams: S11
+
+      --FLASH TEAR STREAM S11     
+      NO. TEMP ITER =    6     TEMP =  274.138    
+      KODE = 1  NTRIAL =   6  T = 274.1377  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER01 ITER    9:   3 VARS NOT CONVERGED, MAX ERR/TOL      1096.5        TIME =      0.31
+
+      UOS BLOCK MIX1     MODEL: MIXER                                             TIME =      0.31
+      KODE = 1  NTRIAL =   3  T = 274.1229  P = 2.480000E+06  V = 8.119935E-02  Q =  0.00000    
+
+      UOS BLOCK FORM1    MODEL: SEP                                               TIME =      0.31
+      ---FLASH OUTLET STREAM S5      :
+      KODE = 2  NTRIAL =   2  T = 274.1229  P = 2.480000E+06  V = 0.998594      Q =  0.00000    
+      ---FLASH OUTLET STREAM S6      :
+      KODE = 2  NTRIAL =   2  T = 274.1229  P = 2.480000E+06  V = 2.498550E-02  Q =  0.00000    
+
+      UOS BLOCK VALV1    MODEL: VALVE                                             TIME =      0.31
+      KODE = 1  NTRIAL =  11  T = 274.2629  P =  400000.      V = 2.523280E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS1    MODEL: FLASH2                                            TIME =      0.31
+      KODE = 2  NTRIAL =   2  T = 285.1500  P =  400000.      V = 2.525866E-02  Q =  303035.    
+
+      UOS BLOCK PUMP1    MODEL: PUMP                                              TIME =      0.31
+      VOL-FLOW   =  0.5624E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1181E+05 , BRAKE PWR  =  0.1687E+05 , ELEC PWR   =  0.1687E+05
+
+      UOS BLOCK CHILL2   MODEL: HEATER                                            TIME =      0.31
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -306496.    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.31
+      ITER  10 For Tear Streams: S11
+
+      --FLASH TEAR STREAM S11     
+      NO. TEMP ITER =    6     TEMP =  274.150    
+      KODE = 1  NTRIAL =   4  T = 274.1503  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER01 ITER   10:   2 VARS NOT CONVERGED, MAX ERR/TOL     -959.88        TIME =      0.31
+
+      UOS BLOCK MIX1     MODEL: MIXER                                             TIME =      0.31
+      KODE = 1  NTRIAL =   2  T = 274.1339  P = 2.480000E+06  V = 8.126258E-02  Q =  0.00000    
+
+      UOS BLOCK FORM1    MODEL: SEP                                               TIME =      0.31
+      ---FLASH OUTLET STREAM S5      :
+      KODE = 2  NTRIAL =   2  T = 274.1339  P = 2.480000E+06  V = 0.998596      Q =  0.00000    
+      ---FLASH OUTLET STREAM S6      :
+      KODE = 2  NTRIAL =   2  T = 274.1339  P = 2.480000E+06  V = 2.499752E-02  Q =  0.00000    
+
+      UOS BLOCK VALV1    MODEL: VALVE                                             TIME =      0.31
+      KODE = 1  NTRIAL =  11  T = 274.2751  P =  400000.      V = 2.524463E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS1    MODEL: FLASH2                                            TIME =      0.31
+      KODE = 2  NTRIAL =   2  T = 285.1500  P =  400000.      V = 2.527053E-02  Q =  302391.    
+
+      UOS BLOCK PUMP1    MODEL: PUMP                                              TIME =      0.31
+      VOL-FLOW   =  0.5618E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1180E+05 , BRAKE PWR  =  0.1685E+05 , ELEC PWR   =  0.1685E+05
+
+      UOS BLOCK CHILL2   MODEL: HEATER                                            TIME =      0.31
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -306192.    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.31
+      ITER  11 For Tear Streams: S11
+
+      --FLASH TEAR STREAM S11     
+      NO. TEMP ITER =    6     TEMP =  274.150    
+      KODE = 1  NTRIAL =   4  T = 274.1497  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER01 ITER   11:   1 VARS NOT CONVERGED, MAX ERR/TOL     -1.1150        TIME =      0.31
+
+      UOS BLOCK MIX1     MODEL: MIXER                                             TIME =      0.31
+      KODE = 1  NTRIAL =   1  T = 274.1333  P = 2.480000E+06  V = 8.133661E-02  Q =  0.00000    
+
+      UOS BLOCK FORM1    MODEL: SEP                                               TIME =      0.31
+      ---FLASH OUTLET STREAM S5      :
+      KODE = 2  NTRIAL =   1  T = 274.1333  P = 2.480000E+06  V = 0.998597      Q =  0.00000    
+      ---FLASH OUTLET STREAM S6      :
+      KODE = 2  NTRIAL =   1  T = 274.1333  P = 2.480000E+06  V = 2.502189E-02  Q =  0.00000    
+
+      UOS BLOCK VALV1    MODEL: VALVE                                             TIME =      0.31
+      KODE = 1  NTRIAL =  11  T = 274.2742  P =  400000.      V = 2.526901E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS1    MODEL: FLASH2                                            TIME =      0.31
+      KODE = 2  NTRIAL =   1  T = 285.1500  P =  400000.      V = 2.529495E-02  Q =  302122.    
+
+      UOS BLOCK PUMP1    MODEL: PUMP                                              TIME =      0.32
+      VOL-FLOW   =  0.5613E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1179E+05 , BRAKE PWR  =  0.1684E+05 , ELEC PWR   =  0.1684E+05
+
+      UOS BLOCK CHILL2   MODEL: HEATER                                            TIME =      0.32
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -305889.    
+
+      CONVERGENCE BLOCK $OLVER01  METHOD: WEGSTEIN                                TIME =      0.32
+      ITER  12 For Tear Streams: S11
+
+  LOOP $OLVER01 ITER   12:     *** CONVERGED *** , MAX ERR/TOL    -0.99044        TIME =      0.32
+
+      UOS BLOCK COMP2    MODEL: COMPR                                             TIME =      0.32
+      OUTLET TEMP =   470.3       OUTLET PRES =  0.2500E+07   INDICATED HP =  0.5895E+05   BRAKE HP =  0.5895E+05
+      ISENTR TEMP =   425.5      CALC ISENTR EFF =  0.7200      ISENTR HP =  0.4244E+05  HP =   479.6    
+
+      UOS BLOCK CHILL3   MODEL: HEATER                                            TIME =      0.32
+      KODE = 2  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  1.00000      Q = -71449.2    
+
+      CONVERGENCE BLOCK $OLVER02  METHOD: WEGSTEIN                                TIME =      0.32
+      ITER   0 For Tear Streams: S21
+
+      ENTHALPY CALCULATION FOR INLET STREAM S21 OF BLOCK MIX2                     TIME =      0.32
+      KODE = 2  NTRIAL =   4  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+      UOS BLOCK MIX2     MODEL: MIXER                                             TIME =      0.32
+      KODE = 1  NTRIAL =  13  T = 273.9791  P = 2.480000E+06  V = 6.577153E-02  Q =  0.00000    
+
+      UOS BLOCK FORM2    MODEL: SEP                                               TIME =      0.32
+      ---FLASH OUTLET STREAM S15     :
+      KODE = 2  NTRIAL =   8  T = 273.9791  P = 2.480000E+06  V = 0.990525      Q =  0.00000    
+      ---FLASH OUTLET STREAM S16     :
+      KODE = 2  NTRIAL =   6  T = 273.9791  P = 2.480000E+06  V = 5.706928E-02  Q =  0.00000    
+
+      UOS BLOCK VALV2    MODEL: VALVE                                             TIME =      0.32
+      KODE = 1  NTRIAL =  11  T = 273.3419  P =  400000.      V = 6.137920E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS2    MODEL: FLASH2                                            TIME =      0.32
+      KODE = 2  NTRIAL =   6  T = 285.1500  P =  400000.      V = 6.321047E-02  Q =  128865.    
+
+      UOS BLOCK PUMP2    MODEL: PUMP                                              TIME =      0.32
+      VOL-FLOW   =  0.2436E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =   5115.     , BRAKE PWR  =   7307.     , ELEC PWR   =   7307.    
+
+      UOS BLOCK CHILL4   MODEL: HEATER                                            TIME =      0.32
+      KODE = 2  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -114097.    
+
+      CONVERGENCE BLOCK $OLVER02  METHOD: WEGSTEIN                                TIME =      0.32
+      ITER   1 For Tear Streams: S21
+
+      --FLASH TEAR STREAM S21     
+      NO. TEMP ITER =    7     TEMP =  274.150    
+      KODE = 1  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER02 ITER    1:   4 VARS NOT CONVERGED, MAX ERR/TOL      1000.0        TIME =      0.32
+
+      UOS BLOCK MIX2     MODEL: MIXER                                             TIME =      0.32
+      KODE = 1  NTRIAL =   6  T = 273.9277  P = 2.480000E+06  V = 6.828323E-02  Q =  0.00000    
+
+      UOS BLOCK FORM2    MODEL: SEP                                               TIME =      0.32
+      ---FLASH OUTLET STREAM S15     :
+      KODE = 2  NTRIAL =   2  T = 273.9277  P = 2.480000E+06  V = 0.990603      Q =  0.00000    
+      ---FLASH OUTLET STREAM S16     :
+      KODE = 2  NTRIAL =   6  T = 273.9277  P = 2.480000E+06  V = 5.935157E-02  Q =  0.00000    
+
+      UOS BLOCK VALV2    MODEL: VALVE                                             TIME =      0.32
+      KODE = 1  NTRIAL =  12  T = 273.0458  P =  400000.      V = 6.370667E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS2    MODEL: FLASH2                                            TIME =      0.32
+      KODE = 2  NTRIAL =  29  T = 285.1500  P =  400000.      V = 0.108687      Q =  163425.    
+
+      UOS BLOCK PUMP2    MODEL: PUMP                                              TIME =      0.32
+      VOL-FLOW   =  0.1882E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =   3953.     , BRAKE PWR  =   5647.     , ELEC PWR   =   5647.    
+
+      UOS BLOCK CHILL4   MODEL: HEATER                                            TIME =      0.32
+      KODE = 2  NTRIAL =   5  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -102436.    
+
+      CONVERGENCE BLOCK $OLVER02  METHOD: WEGSTEIN                                TIME =      0.32
+      ITER   2 For Tear Streams: S21
+
+      --FLASH TEAR STREAM S21     
+      NO. TEMP ITER =    6     TEMP =  274.150    
+      KODE = 1  NTRIAL =   6  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER02 ITER    2:   4 VARS NOT CONVERGED, MAX ERR/TOL     -992.27        TIME =      0.32
+
+      UOS BLOCK MIX2     MODEL: MIXER                                             TIME =      0.32
+      KODE = 1  NTRIAL =   6  T = 274.2767  P = 2.480000E+06  V = 7.194217E-02  Q =  0.00000    
+
+      UOS BLOCK FORM2    MODEL: SEP                                               TIME =      0.32
+      ---FLASH OUTLET STREAM S15     :
+      KODE = 2  NTRIAL =   2  T = 274.2767  P = 2.480000E+06  V = 0.990532      Q =  0.00000    
+      ---FLASH OUTLET STREAM S16     :
+      KODE = 2  NTRIAL =   4  T = 274.2767  P = 2.480000E+06  V = 6.308182E-02  Q =  0.00000    
+
+      UOS BLOCK VALV2    MODEL: VALVE                                             TIME =      0.32
+      KODE = 1  NTRIAL =  10  T = 273.8101  P =  400000.      V = 6.335690E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS2    MODEL: FLASH2                                            TIME =      0.32
+      KODE = 2  NTRIAL =   3  T = 285.1500  P =  400000.      V = 6.343761E-02  Q =  107603.    
+
+      UOS BLOCK PUMP2    MODEL: PUMP                                              TIME =      0.32
+      VOL-FLOW   =  0.1878E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =   3944.     , BRAKE PWR  =   5634.     , ELEC PWR   =   5634.    
+
+      UOS BLOCK CHILL4   MODEL: HEATER                                            TIME =      0.32
+      KODE = 2  NTRIAL =   4  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -102345.    
+
+      CONVERGENCE BLOCK $OLVER02  METHOD: WEGSTEIN                                TIME =      0.32
+      ITER   3 For Tear Streams: S21
+
+      --FLASH TEAR STREAM S21     
+      NO. TEMP ITER =    6     TEMP =  274.142    
+      KODE = 1  NTRIAL =   5  T = 274.1421  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER02 ITER    3:   3 VARS NOT CONVERGED, MAX ERR/TOL     -984.32        TIME =      0.32
+
+      UOS BLOCK MIX2     MODEL: MIXER                                             TIME =      0.32
+      KODE = 1  NTRIAL =   3  T = 274.2045  P = 2.480000E+06  V = 7.161950E-02  Q =  0.00000    
+
+      UOS BLOCK FORM2    MODEL: SEP                                               TIME =      0.32
+      ---FLASH OUTLET STREAM S15     :
+      KODE = 2  NTRIAL =   2  T = 274.2045  P = 2.480000E+06  V = 0.990535      Q =  0.00000    
+      ---FLASH OUTLET STREAM S16     :
+      KODE = 2  NTRIAL =   2  T = 274.2045  P = 2.480000E+06  V = 6.274999E-02  Q =  0.00000    
+
+      UOS BLOCK VALV2    MODEL: VALVE                                             TIME =      0.32
+      KODE = 1  NTRIAL =  10  T = 273.7837  P =  400000.      V = 6.302206E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS2    MODEL: FLASH2                                            TIME =      0.32
+      KODE = 2  NTRIAL =   2  T = 285.1500  P =  400000.      V = 6.310284E-02  Q =  107780.    
+
+      UOS BLOCK PUMP2    MODEL: PUMP                                              TIME =      0.32
+      VOL-FLOW   =  0.1878E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =   3943.     , BRAKE PWR  =   5633.     , ELEC PWR   =   5633.    
+
+      UOS BLOCK CHILL4   MODEL: HEATER                                            TIME =      0.32
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -102332.    
+
+      CONVERGENCE BLOCK $OLVER02  METHOD: WEGSTEIN                                TIME =      0.32
+      ITER   4 For Tear Streams: S21
+
+      --FLASH TEAR STREAM S21     
+      NO. TEMP ITER =    6     TEMP =  274.150    
+      KODE = 1  NTRIAL =   4  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  0.00000    
+
+  LOOP $OLVER02 ITER    4:   1 VARS NOT CONVERGED, MAX ERR/TOL      5.5833        TIME =      0.33
+
+      UOS BLOCK MIX2     MODEL: MIXER                                             TIME =      0.33
+      KODE = 1  NTRIAL =   2  T = 274.2117  P = 2.480000E+06  V = 7.164673E-02  Q =  0.00000    
+
+      UOS BLOCK FORM2    MODEL: SEP                                               TIME =      0.33
+      ---FLASH OUTLET STREAM S15     :
+      KODE = 2  NTRIAL =   2  T = 274.2117  P = 2.480000E+06  V = 0.990539      Q =  0.00000    
+      ---FLASH OUTLET STREAM S16     :
+      KODE = 2  NTRIAL =   2  T = 274.2117  P = 2.480000E+06  V = 6.277372E-02  Q =  0.00000    
+
+      UOS BLOCK VALV2    MODEL: VALVE                                             TIME =      0.33
+      KODE = 1  NTRIAL =  10  T = 273.7909  P =  400000.      V = 6.304585E-02  Q =  0.00000    
+      OUTLET PRES =   0.4000E+06 PRES DROP =   0.2080E+07
+
+      UOS BLOCK DISS2    MODEL: FLASH2                                            TIME =      0.33
+      KODE = 2  NTRIAL =   1  T = 285.1500  P =  400000.      V = 6.312663E-02  Q =  107665.    
+
+      UOS BLOCK PUMP2    MODEL: PUMP                                              TIME =      0.33
+      VOL-FLOW   =  0.1877E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =   3941.     , BRAKE PWR  =   5630.     , ELEC PWR   =   5630.    
+
+      UOS BLOCK CHILL4   MODEL: HEATER                                            TIME =      0.33
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -102286.    
+
+      CONVERGENCE BLOCK $OLVER02  METHOD: WEGSTEIN                                TIME =      0.33
+      ITER   5 For Tear Streams: S21
+
+  LOOP $OLVER02 ITER    5:     *** CONVERGED *** , MAX ERR/TOL    -0.48126        TIME =      0.33
+
+
+  *   WARNING WHILE IN SEQUENCE MONITOR                        (BALMAS.1)       
+      BLOCK CHILL2 IS NOT IN MASS BALANCE:                                      
+      MASS INLET FLOW = 0.56487978E+01, MASS OUTLET FLOW = 0.56497315E+01       
+      RELATIVE DIFFERENCE = 0.16527765E-03                                      
+      IMBALANCE IS DUE TO A LOOSE TEAR TOLERANCE                                
+      STREAM S11      TOLERANCE =  0.10000000E-02                               
+
+
+  *   WARNING WHILE IN SEQUENCE MONITOR                        (BALMAS.1)       
+      STREAMS CROSSING THE LOOP CONVERGED BY $OLVER02 ARE NOT IN MASS BALANCE:  
+      MASS INLET FLOW = 0.35244422E+00, MASS OUTLET FLOW = 0.35258494E+00       
+      RELATIVE DIFFERENCE = 0.39927742E-03                                      
+      IMBALANCE MAY BE DUE TO A LARGE RECYCLE FLOW, AND A                       
+      RELATIVELY LOOSE TEAR STREAM TOLERANCE.                                   
+
+      GENERATING RESULTS FOR UOS BLOCK CHILL1   MODEL: HEATER                     TIME =      0.33
+
+      GENERATING RESULTS FOR UOS BLOCK PUMP1    MODEL: PUMP                       TIME =      0.33
+      KODE = 5  NTRIAL =   6  T = 285.1500  P =  400000.      V =  0.00000      Q = 1.569763E-06
+      VOL-FLOW   =  0.5613E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =  0.1179E+05 , BRAKE PWR  =  0.1684E+05 , ELEC PWR   =  0.1684E+05
+      NPSH AVAIL =   0.000    
+
+      GENERATING RESULTS FOR UOS BLOCK CHILL2   MODEL: HEATER                     TIME =      0.33
+
+      GENERATING RESULTS FOR UOS BLOCK CHILL3   MODEL: HEATER                     TIME =      0.33
+
+      GENERATING RESULTS FOR UOS BLOCK PUMP2    MODEL: PUMP                       TIME =      0.33
+      KODE = 5  NTRIAL =   6  T = 285.1500  P =  400000.      V =  0.00000      Q = 3.686883E-06
+      VOL-FLOW   =  0.1877E-02 , DELTA P    =  0.2100E+07 , PUMP EFF   =  0.7000    
+      FLUID PWR  =   3941.     , BRAKE PWR  =   5630.     , ELEC PWR   =   5630.    
+      NPSH AVAIL =   0.000    
+
+      GENERATING RESULTS FOR UOS BLOCK CHILL4   MODEL: HEATER                     TIME =      0.33
+      STREAM S11 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   4  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  8.27903    
+      STREAM S21 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =-0.346459    
+<set objective = None>
+
+ Report Writer entered                                                            Time =      1.05
+      STREAM S11 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   4  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  8.27903    
+      STREAM S21 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =-0.346459    
+
+ Results generated                                                                Time =      1.08
+
+ Report Writer entered                                                            Time =      1.16
+      STREAM S11 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   4  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  8.27903    
+      STREAM S21 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =-0.346459    
+
+ Results generated                                                                Time =      1.18
+
+RUN SAVED
+
+
+
+ *** SUMMARY OF ERRORS ***
+
+                  PHYSICAL
+                  PROPERTY  SYSTEM  SIMULATION
+ TERMINAL ERRORS      0        0         0
+   SEVERE ERRORS      0        0         0
+          ERRORS      0        0         2
+        WARNINGS      0        0         3
+
+ Report Writer entered                                                            Time =      1.50
+      STREAM S11 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   4  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  8.27903    
+      STREAM S21 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =-0.346459    
+
+ Results generated                                                                Time =      1.52
+
+ Report Writer entered                                                            Time =      1.64
+      STREAM S11 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   4  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =  8.27903    
+      STREAM S21 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =-0.346459    
+
+ Results generated                                                                Time =      1.66
+
+RUN SAVED
+
+
+
+ *** SUMMARY OF ERRORS ***
+
+                  PHYSICAL
+                  PROPERTY  SYSTEM  SIMULATION
+ TERMINAL ERRORS      0        0         0
+   SEVERE ERRORS      0        0         0
+          ERRORS      0        0         2
+        WARNINGS      0        0         3

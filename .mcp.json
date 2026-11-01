@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "aspenplus": {
+      "command": "python",
+      "args": [
+        "-m",
+        "aspenplus_mcp.server"
+      ],
+      "env": {
+        "PYTHONPATH": "c:\\Users\\hskus\\Documents\\MTP\\BTP-II\\hydrate_project\\aspenplus_mcp_server\\src"
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+MMBACKUP:
+INPUT: hydrate_base.inm
+MODNAME: apmain
+RUNID: hydrate_base
+NEW_RUNID: hydrate_base
+OLD_RUNID: hydrate_base
+PDF: hydrate_base.appdf
+USERNAME: hskus
+XMOD: C:\Program Files\AspenTech\Aspen Plus V14.0\Engine\xeq\apmain
+SPONLY:
+DBCONN: _5806ldk.ads

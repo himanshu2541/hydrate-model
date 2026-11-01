@@ -1,0 +1,22 @@
+System,Reference,Structure,T_K,T_C,P_eq_MPa
+CO2/H2 (39.2/60.8 mol%),Kumar et al. (2006),sI,273.9,0.75,5.56
+CO2/H2 (39.2/60.8 mol%),Kumar et al. (2006),sI,274.6,1.45,6.04
+CO2/H2 (39.2/60.8 mol%),Kumar et al. (2006),sI,275.1,1.95,6.41
+CO2/H2 (39.2/60.8 mol%),Kumar et al. (2006),sI,275.6,2.45,6.84
+CO2/H2 (39.2/60.8 mol%),Kumar et al. (2006),sI,276.0,2.85,7.16
+CO2/H2 (39.2/60.8 mol%),Kumar et al. (2006),sI,276.4,3.25,7.56
+CO2/H2 (39.2/60.8 mol%),Kumar et al. (2006),sI,276.7,3.55,7.95
+CO2/H2 (39.2/60.8 mol%),Kumar et al. (2006),sI,277.5,4.35,9.15
+CO2/H2 (39.2/60.8 mol%),Kumar et al. (2006),sI,277.7,4.55,9.42
+CO2/H2 (39.2/60.8 mol%),Kumar et al. (2006),sI,278.4,5.25,10.74
+Pure CO2,Sloan & Koh (2008),sI,273.15,0.0,1.25
+Pure CO2,Sloan & Koh (2008),sI,274.15,1.0,1.4
+Pure CO2,Sloan & Koh (2008),sI,275.15,2.0,1.5
+Pure CO2,Sloan & Koh (2008),sI,276.15,3.0,1.75
+Pure CO2,Sloan & Koh (2008),sI,277.15,4.0,2.0
+Pure CO2,Sloan & Koh (2008),sI,278.15,5.0,2.25
+Pure CO2,Sloan & Koh (2008),sI,279.15,6.0,2.6
+Pure CO2,Sloan & Koh (2008),sI,280.15,7.0,3.0
+Pure CO2,Sloan & Koh (2008),sI,281.15,8.0,3.4
+Pure CO2,Sloan & Koh (2008),sI,282.15,9.0,3.9
+Pure CO2,Sloan & Koh (2008),sI,283.15,10.0,4.5

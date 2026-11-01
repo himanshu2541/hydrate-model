@@ -1,0 +1,10 @@
+INPUT: Two_Stage_Hydrate_Capture_Final.inm
+MODNAME: apmain
+RUNID: Two_Stage_Hydrate_Capture_Final
+NEW_RUNID: Two_Stage_Hydrate_Capture_Final
+OLD_RUNID: Two_Stage_Hydrate_Capture_Final
+PDF: Two_Stage_Hydrate_Capture_Final.appdf
+USERNAME: hskus
+XMOD: C:\Program Files\AspenTech\Aspen Plus V14.0\Engine\xeq\apmain
+SPONLY:
+DBCONN: _3608jgs.ads

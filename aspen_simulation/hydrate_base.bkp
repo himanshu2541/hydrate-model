@@ -1,0 +1,248 @@
+MM "40.0" FLAVOR "NO" VERSION "40.0" DATETIME "Sun Nov  1 12:58:10 2026" 
+MACHINE "WIN-NT/VC"  ; 
+startlibrary
+version1
+NumLibs = 2
+Built-In
+ACM Built-In
+NumCats = 12
+Mixers/Splitters
+active
+Separators
+active
+Exchangers
+active
+Columns
+active
+Reactors
+active
+Pressure Changers
+active
+Manipulators
+active
+Solids
+active
+Solids Separators
+active
+Controllers
+active
+Batch Models
+active
+User Models
+active
+endlibrary
+; 
+0
+? SETUP MAIN ? \ TITLE TITLE = "HYDRATE TWO STAGE SEPARATION" \ \ SIMULATE 
+INTERACTIVE = NO \ ? SETUP GLOBAL ? \ "IN-UNITS" INSET = SET1 \ \ 
+"STREAM-CLASS" SCLASS = CONVEN \ ? SETUP "SIM-OPTIONS" ? ; "SET1_MOLE" ; ? 
+SETUP "UNITS-SET" SET1 ? \ DESCRIPTION DESCRIPTION = "User-defined units set" 
+\ \ MMLOCAL \ \ UNITSET BASESET = MET ( 3 3 3 3 3 3 3 3 3 3 3 7 18 3 3 16 3 3 
+3 5 3 4 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 
+3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 
+3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 
+3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 ) \ ? DATABANKS ? \ DATABANKS 
+FILE-SYM-NAM = ( "APV140 PURE40" "APV140 AQUEOUS" "APV140 SOLIDS" 
+"APV140 INORGANIC" ) \ ? COMPONENTS MAIN ? \ COMPONENTS CID = CO2 ANAME = CO2 
+OUTNAME = CO2 DBNAME1 = "CARBON-DIOXIDE" ANAME1 = "CO2" /  CID = H2 ANAME = 
+H2 OUTNAME = H2 DBNAME1 = "HYDROGEN" ANAME1 = "H2" /  CID = H2O ANAME = H2O 
+OUTNAME = H2O DBNAME1 = "WATER" ANAME1 = "H2O" /  CID = DIOXANE ANAME = 
+C4H8O2-1 OUTNAME = DIOXANE DBNAME1 = "N-BUTYRIC-ACID" ANAME1 = "C4H8O2-1" \ ? 
+COMPONENTS "COMP-LIST" GLOBAL ? ? SOLVE ? \ "RUN-MODE" MODE = SIM \ ? 
+"DYN-OPTIONS" ? ? FLOWSHEET GLOBAL ? \ "DEF-STREAM" SCLASS = "CONVEN" \ ? 
+PROPERTIES MAIN ? \ GPROPERTIES GBASEOPSET = "RK-SOAVE" GOPSETNAME = "RK-SOAVE" 
+PARCON = -2 \ ? PROPERTIES "OPTION-SETS" "RK-SOAVE" ? \ PARAM BASE = "RK-SOAVE" 
+\ ? PROPERTIES "MOLEC-STRUCT" CO2 ? ? PROPERTIES "MOLEC-STRUCT" DIOXANE ? ? 
+PROPERTIES "MOLEC-STRUCT" H2 ? ? PROPERTIES "MOLEC-STRUCT" H2O ? ? PROPERTIES 
+PARAMETERS BINARY SCALAR "MLQKIJ-1" ? ; "SET1_MOLE" ; \ PROP-LIST PARAMNAME
+ = MLQKIJ SETNO = 1 \ ? PROPERTIES PARAMETERS BINARY SCALAR "RKTKIJ-1" ? ; 
+"SET1_MOLE" ; \ PROP-LIST PARAMNAME = RKTKIJ SETNO = 1 \ ? PROPERTIES 
+PARAMETERS BINARY "T-DEPENDENT" "ANDKIJ-1" ? ; "SET1_MOLE" ; \ PROP-LIST 
+PARAMNAME = ANDKIJ SETNO = 1 UNITROW = 0 TUNITROW = 22 TUNITLABEL = F NEL = 2 
+\ ? PROPERTIES PARAMETERS BINARY "T-DEPENDENT" "ANDMIJ-1" ? ; "SET1_MOLE" ; 
+\ PROP-LIST PARAMNAME = ANDMIJ SETNO = 1 UNITROW = 0 TUNITROW = 22 TUNITLABEL
+ = F NEL = 2 \ ? PROPERTIES PARAMETERS BINARY "T-DEPENDENT" "MUKIJ-1" ? ; 
+"SET1_MOLE" ; \ PROP-LIST PARAMNAME = MUKIJ SETNO = 1 UNITROW = 0 TUNITROW = 
+22 TUNITLABEL = F NEL = 6 \ ? PROPERTIES PARAMETERS BINARY "T-DEPENDENT" 
+"MULIJ-1" ? ; "SET1_MOLE" ; \ PROP-LIST PARAMNAME = MULIJ SETNO = 1 UNITROW
+ = 0 TUNITROW = 22 TUNITLABEL = F NEL = 11 \ ? PROPERTIES PARAMETERS BINARY 
+"T-DEPENDENT" "RKSKBV-1" ? ; "SET1_MOLE" ; \ PROP-LIST PARAMNAME = RKSKBV 
+SETNO = 1 UNITROW = 0 TUNITROW = 22 TUNITLABEL = F NEL = 5 \ ? PROPERTIES 
+PARAMETERS BINARY "T-DEPENDENT" "RKSLBV-1" ? ; "SET1_MOLE" ; \ PROP-LIST 
+PARAMNAME = RKSLBV SETNO = 1 UNITROW = 0 TUNITROW = 22 TUNITLABEL = F NEL = 8 
+\ ? "STREAM-GROUP" All ? \ DESCRIPTION DESCRIPTION = "All streams" \ ? 
+"STREAM-GROUP" Boundary ? \ DESCRIPTION DESCRIPTION = "Boundary streams" \ ? 
+"STREAM-GROUP" Charge ? \ DESCRIPTION DESCRIPTION = "Charge streams" \ ? 
+"STREAM-GROUP" Feeds ? \ DESCRIPTION DESCRIPTION = "Feed streams" \ ? 
+"STREAM-GROUP" Initial ? \ DESCRIPTION DESCRIPTION = 
+"Streams with user-specified values entered" \ ? "STREAM-GROUP" Products ? 
+\ DESCRIPTION DESCRIPTION = "Product streams" \ ? "STREAM-GROUP" Tears ? \ 
+DESCRIPTION DESCRIPTION = 
+"Tear streams manipulated by the convergence algorithms" \ ? "EO-VARS" ? ? 
+"EO-CONV-OPTI" ? \ DMO-PARAMS MODE = DEFAULT \ \ DMO-PARAMS MODE = SIMULATION 
+\ \ DMO-PARAMS MODE = "PARAMETER-ESTIMATION" \ \ DMO-PARAMS MODE = 
+RECONCILIATION \ \ DMO-PARAMS MODE = OPTIMIZATION \ \ LSSQP-PARAMS MODE-L = 
+DEFAULT \ \ LSSQP-PARAMS MODE-L = SIMULATION \ \ LSSQP-PARAMS MODE-L = 
+"PARAMETER-ESTIMATION" \ \ LSSQP-PARAMS MODE-L = RECONCILIATION \ \ 
+LSSQP-PARAMS MODE-L = OPTIMIZATION \ \ NSOLVE-PARAM NSOLVE-MODE = DEFAULT \ 
+\ NSOLVE-PARAM NSOLVE-MODE = SIMULATION \ \ NSOLVE-PARAM NSOLVE-MODE = 
+"PARAMETER-ESTIMATION" \ \ XSLP-PARAMS XSLP-MODE = DEFAULT \ \ XSLP-PARAMS 
+XSLP-MODE = SIMULATION \ \ XSLP-PARAMS XSLP-MODE = "PARAMETER-ESTIMATION" \ 
+\ XSLP-PARAMS XSLP-MODE = RECONCILIATION \ \ XSLP-PARAMS XSLP-MODE = 
+OPTIMIZATION \ 
+
+ GRAPHICS_BACKUP
+PFS V 5.00
+$CONFIG
+paramdata APV140 ENRTL-RK
+paramdata APV140 VLE-IG
+paramdata APV140 VLE-RK
+paramdata APV140 VLE-HOC
+paramdata APV140 LLE-LIT
+paramdata APV140 LLE-ASPEN
+paramdata APV140 VLE-LIT
+paramdata APV140 BINARY
+paramdata APV140 HENRY-AP
+paramdata APV140 PITZER
+paramdata APV140 EOS-LIT
+paramdata APV140 HENRY-AP
+paramdata APV140 SRK-ASPEN
+paramdata APV140 PC-SAFT
+paramdata APV140 POLYPCSF
+paramdata APV140 HYSYS
+paramdata APESV140 AP-EOS
+paramdata NISTV140 NIST-HOC
+paramdata NISTV140 NIST-IG
+paramdata NISTV140 NIST-RK
+paramdata NISTV140 NIST-EOS
+purebank APV140 PURE40
+purebank APV140 AQUEOUS
+purebank APV140 SOLIDS
+purebank APV140 INORGANIC
+purebank APESV140 AP-EOS
+purebank NISTV140 NIST-TRC
+regdbank 0
+ftn_check 1
+autoblockid 1
+autostreamid 1
+showblockid 1
+showstreamid 1
+autoplacement 1
+grid 2
+gridresolution 0.100000
+scale 0
+streamprefix 
+blockprefix B
+labelscale 1.000000
+3DOn 1
+qwformat %.0f
+wformat %.0f
+tempformat %.0f
+presformat %.0f
+flowformat %.0f
+strmqwformat %.0f
+strmwformat %.0f
+vflowformat %.0f
+mflowformat %.0f
+vfracformat %.2f
+pseudobatch 0
+partial 1
+animation 1
+runanyway 0
+globalqw 0
+globalw 0
+globaltemp 0
+globalpres 0
+globalflow 0
+globalstrmqw 0
+globalstrmw 0
+globalvflow 0
+globalmflow 0
+globalvfrac 0
+globalshowcalcerror 1
+globalshowcalcwarning 1
+globalshowdisabled 1
+tooldrawvisible 0
+browserheight 7530
+browserwidth 10725
+browsertreewidth 2450
+polyplusenabled 1
+dynaplusenabled 1
+bfracenabled 1
+rtfenabled 1
+rspenabled 1
+initializeicarus 0
+pinchenabled 0
+linklimit 5000
+material_color 0
+material_style 0
+material_width 1
+material_termid 
+heat_color 0
+heat_style 1
+heat_width 1
+heat_termid Q
+work_color 0
+work_style 2
+work_width 1
+work_termid W
+connections_color 9
+connections_style 3
+connections_width 1
+connections_termid 
+measurements_color 4
+measurements_style 4
+measurements_width 1
+measurements_termid 
+power_color 10
+power_style 5
+power_width 1
+power_termid I
+displayeoconn 0
+displaycalcs 0
+displaytransfers 0
+displaymeas 0
+displaydesignspecs 0
+displaycalccons 0
+displaymeascons 0
+displayothercons 0
+displayeomeas 1
+displayeomeastype 2
+displayothermanipconn 0
+showeoviews 0
+eoautosave 1
+allow_system_userprops 0
+copy_estimation 1
+copy_retrieved 1
+purge_incomp_params 0
+set_default_biparams 0
+set_default_dataset1 0
+set_default_dataset0 1
+bestinput 0
+autosmrun 0
+genallpropset 0
+strmresformdefault 0
+roottype 0
+exchangerfile 1
+streamformat 1
+runsettingfile 1
+usermodelfile 1
+fortranfile 0
+timeout 1000
+auto_evaluate 0
+customglobaldatapropset1 0 | Custom1 | * | %.2f | 0 | 6
+customglobaldatapropset2 0 | Custom2 | * | %.2f | 1 | 7
+customglobaldatapropset3 0 | Custom3 | * | %.2f | 2 | 8
+customglobaldatapropset4 0 | Custom4 | * | %.2f | 4 | 9
+customglobaldatapropset5 0 | Custom5 | * | %.2f | 5 | 10
+customglobaldatapropset6 0 | Custom6 | * | %.2f | 6 | 11
+customglobaldatapropset7 0 | Custom7 | * | %.2f | 7 | 12
+economics_active 0
+ignoreEOVarNameFixupsOnImport 1
+tpsaupgrade 0
+#
+#
+E_LINK
+$_ADS_FILE
+dZhLb2S5DYX3AfIfDO8JSyIlUoDHQIAg2SdA9tSrx0Cje9CPAJ1fn3PtUs1Motm5fIu6Evkd8qie/zLa314/zpc//+nh+e/fX8dfX/u318+f/MuPh/75+6dvPz0Wfbyevj9++Ld//D5/ehwj59VSJRHLJFyUWu2RVpY+SmXXVh8fXq/48Pj0//GrhWwihabFTjJNyGMvlHUE5xRSa/MWH0/xUWqQ2hqNFgJJ5k51Bac+87JUx/Lit/h0ii+Rq7eciUszkhUj9l8ytVl94ZllsVs8H9+fJLTiSuktvnamprFRl6jaBe+vfIuX4/uH4wi2SLsVkjSdLK5KdXKqMZq0tt+fj/Eecgxj0VKZOL91ahaZ2HNLpYfe644vp3guLoVVKQRH/stoVLFzUp2tYhMlJLnF6yleRy21CI5eppKEhfy16+NELaOGOXK4xdspPuciPoKRM1Iv5kKGepKZiaoHb6Pf4uspfkpB9bxR6kiCrMVkXgctTp0tN8Uqm58jgC3juNkSKadG0vsiLzYIRRxdS+sh7gPEI4E5cU8yCghQyMBaohp6AIYyLCAPfs9APCKojm94rtgBhCMQDHnSRppAoxkKpLuE8chgAKc95kE8oRzBC6mlYRRr0eCrsoZdw3iEcNSlOgqKEB0LxFlQRIhI3Luad59tQxyPFHbX0Gtzwi4EVYAefQGlsXjluiJO1/YCRwwrUB1zRCrCCRi5E1SII7itIE155i3jeOSwLyhpQYczJXDYJnKAilLr2RjZ5LniXuAIohaVGqHhMKFBWQVlVE0Q8ihpcEBCdyOLZxIjkqiJKSHn4ABNAJ0go5aiy5Ox6CY5nUn0xnWo0SgogHSe5GGgqWkelYdKCmUvcCRReuApXJFE56sX4wiroh4CgQ3DSdq9Fx5J7NlTyqVTLLVfR1hkMwYKI+UuJczSdxLTkUSwkvtsVzerOEIGjq5AOTg6MzKywsx7gSOJ06YEaJpALZoIeiABQcgZbbTptJzSBikdSQwzmYF4Yr3kbAtJhBwpKo+QQ55iG+V0JHGM0eLAAssRCxIn1VwWDUdOUhgllC2mdCRxtBGLz4HjZ4CEOUSesYr0SxJFU5r3Mh5JXCmYYixSuxQgtTo1z2jpsTNEUrC5+wJHEmtMipmAmTYy3lvbwALQlnfOaoZ5IWPPtCOJmXPrV0Ry0ISNozNAV4T3T88q2XnvgI8kooS5uk0KC+dAgy9UReAKBNOelyhGzl7gSKJ0Fei+U86MTCZ05ZovrtBIOkpbEm818pFEbGDVSz3WrpZ2qcIKuEotTkVuau73uX4ksZXGihFAQfSSUAvoiWOQKTiAsxFLG2U+kugJE9gmWlCwazJjPFaMMxpWUuTgVnWLiY8krplzrIwO0gQNpWIv4H/QSCnCnUxwfV/gD2YzLw5NMAguHDs4qAOzeSxYI3RLZV57gSOJHU7MDRFBIQhxucY0zAEaLdfYF9e8xcTnnliblQxjZmFenqCgClcmS6oTrlFVyu6JcraHUI4auihmGTpS7HAGaOcUO7zdMFTEdg7kSCLzrBJh6FBv9APoGVqA00RDkl6rNPPtL+VIomcpaySI2AZfow2HKbmTCnMsAqHJRlmOJPqAK6pwBcnH1Q+go1oHhpzUaaVIizXtBY4kogLVUT0qvtq7RTb0IVjcAevsDTXaapQjiSuOWtfCexmuQAQzyg3TBQt4h6Z7t42yHEkMXGGKG0bbvOaCCmRwebYgyZfA/mS/L3Ak0Zatwckx2q6GEme7XJ5QqF2g5pzmvSPJmcTlPS3wxx5BooYCLaAeUVHDKh4538t4JLFAsiPNSdww1UQ62mu7mLx8C2znhDa3zz6SyKM7LAnEhAaEHYzL6CdUQXz1hXTgvrEXOPdEQ6VlKfVwOeVqIBFDlSJ36KiuInnnIB9JDD22ABdB9mZ1GRxUZoHfx1VpzQEQt9HMRxJbSJBDEFzOUEtYXXj1ES81SkpFYJl1N9V8JJF7aXqZO7Fw3fg4QEfM1EtqC/nFlWGrMZ9JnGU5Bilp7cjBUAylUjGocPvAhSn6r209H0mMivumooxhcrtcWiarGA5WcV9AO8vatj/IRxJxWxwjwmKPGKHGGivKiHTGYJjua3W0yr3A2SfKGgrdELy1vicRagRXOBlue2oh3HdwJLFbn+ZwlrVf03nhMBAHPjZcWQoIW7YbSjmSmJCExVLput/cvHK1QHCZcXY0pV/FVI4k4mo5V4E3w90Qcmb43caY8aFPYFC0uW4xlbNPtNQmVItJch2h4PaEixsSAXH1ymv+6tLKkcSkEAHDHmXGhQ+3VkC9SsBow8hCImCg7rfWI4mroSONFXDhEKDsDTcW6IOS2gIgNdvdrZcjiW2i8V7mBPpHDhAEe4QbtMY1Fztm07jn4Ebi89Pvfxd5+98/Zv/8ZXx9f8H7h4dvP36Z11evnywePrz9AWH2n/3Th+vsjy/P/7o2cXt0Nf+vH25ff8np+ent6e+/hMb+Es5P9PFl+cev8/zU/vfp0/sm/2DD1zx/j0QPum8Z+/pt3P777dTP//zxqf/85fOn1//MF35++u3H56f9q9J/AQ==
+$_END_ADS_FILE
