@@ -1,0 +1,17 @@
+Block,Category,Model_Type,Duty_Gcal_hr,Duty_kW,Power_kW
+B1,Hydrate Formation Reactor,Unit Operation,0.0,0.0,0.0
+B2,Hydrate Formation Reactor,Unit Operation,0.0,0.0,0.0
+CHILL1,Chilling / Refrigeration,Unit Operation,-0.0346,40.25,0.0
+CHILL2,Chilling / Refrigeration,Unit Operation,-0.264,307.03,0.0
+CHILL3,Chilling / Refrigeration,Unit Operation,-0.0622,72.33,0.0
+CHILL4,Chilling / Refrigeration,Unit Operation,-0.0881,102.48,0.0
+COMP1,Compression,ISENTROPIC,0.0,0.0,12.57
+COMP2,Compression,ISENTROPIC,0.0,0.0,58.97
+DISS1,Hydrate Dissociation (Heating),Unit Operation,0.2605,302.94,0.0
+DISS2,Hydrate Dissociation (Heating),Unit Operation,0.0936,108.86,0.0
+MIX1,Feed Mixer,Unit Operation,0.0,0.0,0.0
+MIX2,Feed Mixer,Unit Operation,0.0,0.0,0.0
+PUMP1,Pumping,Unit Operation,0.0,0.0,16.9
+PUMP2,Pumping,Unit Operation,0.0,0.0,5.64
+VALV1,Depressurization Valve,Unit Operation,0.0,0.0,0.0
+VALV2,Depressurization Valve,Unit Operation,0.0,0.0,0.0

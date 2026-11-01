@@ -43,3 +43,9 @@ _*.sum
 *.rp2
 *.scr
 *.sin
+
+# Scratch and dumps
+scratch/
+*.dmp
+*.bk$
+.playwright-mcp/

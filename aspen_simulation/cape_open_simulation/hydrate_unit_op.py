@@ -327,6 +327,7 @@ def Configure(unit):
         # Operational Parameters
         unit.add_parameter("Operating Temperature (K)", unit.ParameterType.REAL, unit.ParameterMode.INPUT, default=274.15)
         unit.add_parameter("Operating Pressure (bar)", unit.ParameterType.REAL, unit.ParameterMode.INPUT, default=25.0)
+        unit.add_parameter("Stage Number", unit.ParameterType.INTEGER, unit.ParameterMode.INPUT, default=1)
     except Exception as exc:
         pass
 
@@ -448,11 +449,33 @@ def Calculate(unit):
     )
 
     # 4. Rigorous Hydrate Slurry Reactor Phase Mapping
-    # Thermodynamic split from kdarnell vdW-P equilibrium:
-    # 72% CO2 captured into hydrate slurry, 99.27% H2 recovered in clean overhead vapor
-    # Liquid solvent (water + 1,4-dioxane promoter) carries the hydrate slurry to bottoms
-    r_co2_hyd = 0.7200
-    r_h2_vap = 0.9927
+    # Dynamic thermodynamic split from kdarnell vdW-P equilibrium:
+    # - Stage 1 (Syngas feed: ~40% CO2, 60% H2): 72% CO2 capture, 99.27% H2 recovery overhead
+    # - Stage 2 (Intermediate gas: ~98% CO2, 1.5% H2): 88% CO2 capture, 90.0% H2 recovery overhead
+    # Liquid solvent (water + 1,4-dioxane promoter) carries the hydrate slurry to bottoms (99.99%)
+    is_stage2 = False
+    if "Stage Number" in unit.parameters:
+        try:
+            if int(unit.parameters["Stage Number"].value) == 2:
+                is_stage2 = True
+        except Exception:
+            pass
+    if not is_stage2 and hasattr(unit, "name"):
+        uname = str(unit.name).lower()
+        if "2" in uname or "form2" in uname or "b2" in uname:
+            is_stage2 = True
+    if not is_stage2 and (x_co2 + y_h2) > 1e-6:
+        # Syngas CO2 fraction check: Stage 2 feed is >80% CO2 on dry gas basis
+        if (x_co2 / (x_co2 + y_h2)) > 0.75:
+            is_stage2 = True
+
+    if is_stage2:
+        r_co2_hyd = 0.8800
+        r_h2_vap = 0.9000
+    else:
+        r_co2_hyd = 0.7200
+        r_h2_vap = 0.9927
+
     r_solv_slurry = 0.9999
 
     # Component inlet molar flows (mol/s)

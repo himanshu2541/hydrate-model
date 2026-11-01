@@ -6796,3 +6796,35 @@ RUN SAVED
    SEVERE ERRORS      0        0         0
           ERRORS      0        0         5
         WARNINGS      0        0         2
+
+ *** CALCULATION TRACE ***
+
+ HYDRATE TWO STAGE SEPARATION                                    
+
+<set objective = None>
+      STREAM S11 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -2.55802    
+      STREAM S21 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =-0.389017    
+
+ Report Writer entered                                                            Time =    663.06
+      STREAM S11 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -2.55802    
+      STREAM S21 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =-0.389017    
+
+ Results generated                                                                Time =    663.12
+
+ Report Writer entered                                                            Time =    663.71
+      STREAM S11 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q = -2.55802    
+      STREAM S21 WILL BE FLASHED FOR PROPERTY CALCULATIONS.
+      KODE = 2  NTRIAL =   3  T = 274.1500  P = 2.480000E+06  V =  0.00000      Q =-0.389017    
+
+ Results generated                                                                Time =    663.73
+
+RUN SAVED
+
+
+
+ NO ERRORS OR WARNINGS GENERATED
