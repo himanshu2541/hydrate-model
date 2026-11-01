@@ -251,19 +251,20 @@ def Configure(unit):
     """
     CAPE-OPEN Unit Operation Configuration Hook.
     Defines inlet/outlet material ports and parameters for Aspen Plus, Aspen HYSYS, and COCO.
+    Supports both 2-product (Vapor_Out, Slurry_Out) and 3-product (Vapor_Out, Hydrate_Out, Liquid_Out) layouts.
     """
     try:
         # Ports
         unit.add_port("Feed", unit.PortType.MATERIAL, unit.PortDirection.FEED)
         unit.add_port("Vapor_Out", unit.PortType.MATERIAL, unit.PortDirection.PRODUCT)
+        unit.add_port("Slurry_Out", unit.PortType.MATERIAL, unit.PortDirection.PRODUCT)
         unit.add_port("Hydrate_Out", unit.PortType.MATERIAL, unit.PortDirection.PRODUCT)
         unit.add_port("Liquid_Out", unit.PortType.MATERIAL, unit.PortDirection.PRODUCT)
 
         # Operational Parameters
-        unit.add_parameter("Operating Temperature (K)", unit.ParameterType.REAL, unit.ParameterMode.INPUT, default=275.0)
-        unit.add_parameter("Operating Pressure (bar)", unit.ParameterType.REAL, unit.ParameterMode.INPUT, default=65.0)
+        unit.add_parameter("Operating Temperature (K)", unit.ParameterType.REAL, unit.ParameterMode.INPUT, default=274.15)
+        unit.add_parameter("Operating Pressure (bar)", unit.ParameterType.REAL, unit.ParameterMode.INPUT, default=25.0)
     except Exception as exc:
-        # Pass gracefully if not in a live CAPE-OPEN PME
         pass
 
 
@@ -279,13 +280,13 @@ def Calculate(unit):
     try:
         T_feed = feed.t if hasattr(feed, 't') else feed.get_property("temperature")
     except Exception:
-        T_feed = 275.0
+        T_feed = 274.15
         
     try:
         P_feed_Pa = feed.p if hasattr(feed, 'p') else feed.get_property("pressure")
         P_bar = P_feed_Pa / 1.0e5
     except Exception:
-        P_bar = 65.0
+        P_bar = 25.0
 
     try:
         total_flow = feed.flow_rate if hasattr(feed, 'flow_rate') else feed.get_property("totalFlow")
@@ -334,6 +335,7 @@ def Calculate(unit):
     alpha_vap = alpha_map.get("vapor", 0.0) + alpha_map.get("lhc", 0.0)
     alpha_hyd = alpha_map.get("s1", 0.0) + alpha_map.get("s2", 0.0)
     alpha_liq = alpha_map.get("aqueous", 0.0)
+    alpha_slurry = alpha_hyd + alpha_liq
 
     # Helper to construct full composition array matching Aspen compound list
     def make_full_x(phase_name):
@@ -342,32 +344,67 @@ def Calculate(unit):
         c_dict = res["compositions"][phase_name]
         return [c_dict.get(normalize_component_name(c), 0.0) for c in comp_names]
 
+    # Helper for combined slurry composition
+    def make_slurry_x():
+        if alpha_slurry <= 1e-6:
+            return fractions
+        hyd_phase = res.get("hydrate_type", "s2")
+        c_hyd = res["compositions"].get(hyd_phase, {})
+        c_aq = res["compositions"].get("aqueous", {})
+        slurry_x = []
+        for c in comp_names:
+            norm_c = normalize_component_name(c)
+            mol_hyd = alpha_hyd * c_hyd.get(norm_c, 0.0)
+            mol_aq = alpha_liq * c_aq.get(norm_c, 0.0)
+            slurry_x.append((mol_hyd + mol_aq) / alpha_slurry)
+        return slurry_x
+
     # Assign to ports
     if "Vapor_Out" in unit.ports:
         gas_phase = "vapor" if "vapor" in res["compositions"] else "lhc"
-        unit.ports["Vapor_Out"].set(
-            t=T_feed,
-            p=P_bar * 1e5,
-            flow_rate=total_flow * alpha_vap,
-            x=make_full_x(gas_phase)
-        )
+        try:
+            unit.ports["Vapor_Out"].set(
+                t=T_feed,
+                p=P_bar * 1e5,
+                flow_rate=total_flow * alpha_vap,
+                x=make_full_x(gas_phase)
+            )
+        except Exception:
+            pass
+
+    if "Slurry_Out" in unit.ports:
+        try:
+            unit.ports["Slurry_Out"].set(
+                t=T_feed,
+                p=P_bar * 1e5,
+                flow_rate=total_flow * alpha_slurry,
+                x=make_slurry_x()
+            )
+        except Exception:
+            pass
 
     if "Hydrate_Out" in unit.ports:
-        hyd_phase = res.get("hydrate_type", "s1")
-        unit.ports["Hydrate_Out"].set(
-            t=T_feed,
-            p=P_bar * 1e5,
-            flow_rate=total_flow * alpha_hyd,
-            x=make_full_x(hyd_phase)
-        )
+        hyd_phase = res.get("hydrate_type", "s2")
+        try:
+            unit.ports["Hydrate_Out"].set(
+                t=T_feed,
+                p=P_bar * 1e5,
+                flow_rate=total_flow * alpha_hyd,
+                x=make_full_x(hyd_phase)
+            )
+        except Exception:
+            pass
 
     if "Liquid_Out" in unit.ports:
-        unit.ports["Liquid_Out"].set(
-            t=T_feed,
-            p=P_bar * 1e5,
-            flow_rate=total_flow * alpha_liq,
-            x=make_full_x("aqueous")
-        )
+        try:
+            unit.ports["Liquid_Out"].set(
+                t=T_feed,
+                p=P_bar * 1e5,
+                flow_rate=total_flow * alpha_liq,
+                x=make_full_x("aqueous")
+            )
+        except Exception:
+            pass
 
 
 # -----------------------------------------------------------------------------
