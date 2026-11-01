@@ -1,0 +1,10 @@
+INPUT: Two_Stage_Hydrate_Capture_CAPE_OPEN.inm
+MODNAME: apmain
+RUNID: Two_Stage_Hydrate_Capture_CAPE_OPEN
+NEW_RUNID: Two_Stage_Hydrate_Capture_CAPE_OPEN
+OLD_RUNID: Two_Stage_Hydrate_Capture_CAPE_OPEN
+PDF: Two_Stage_Hydrate_Capture_CAPE_OPEN.appdf
+USERNAME: hskus
+XMOD: C:\Program Files\AspenTech\Aspen Plus V14.0\Engine\xeq\apmain
+SPONLY:
+DBCONN: _0455ugj.ads
