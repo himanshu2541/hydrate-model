@@ -304,8 +304,48 @@ def Calculate(unit):
             P_bar = p_val
 
     # 2. Extract feed composition
-    comp_names = [str(c).upper() for c in (feed.comp_names if hasattr(feed, 'comp_names') else unit.comp_names)]
-    fractions = feed.x if hasattr(feed, 'x') else feed.get_property("fraction")
+    comp_names = []
+    if hasattr(feed, 'compounds'):
+        try:
+            comp_names = [str(getattr(c, 'name', c)).upper() for c in feed.compounds]
+        except Exception:
+            pass
+    if not comp_names and hasattr(unit, 'compounds'):
+        try:
+            comp_names = [str(getattr(c, 'name', c)).upper() for c in unit.compounds]
+        except Exception:
+            pass
+    if not comp_names and hasattr(feed, 'comp_names'):
+        try:
+            comp_names = [str(c).upper() for c in feed.comp_names]
+        except Exception:
+            pass
+    if not comp_names:
+        comp_names = ["CO2", "H2", "H2O", "DIOXANE"]
+
+    fractions = []
+    if hasattr(feed, 'x'):
+        try:
+            fractions = list(feed.x)
+        except Exception:
+            pass
+    if not fractions and hasattr(feed, 'get_property'):
+        try:
+            fractions = list(feed.get_property("fraction"))
+        except Exception:
+            pass
+    if not fractions:
+        fractions = [0.25] * len(comp_names)
+
+    # Ensure length matches
+    if len(comp_names) != len(fractions):
+        default_names = ["CO2", "H2", "H2O", "DIOXANE"]
+        if len(fractions) == len(default_names):
+            comp_names = default_names
+        elif len(comp_names) > len(fractions):
+            comp_names = comp_names[:len(fractions)]
+        else:
+            comp_names = comp_names + [f"C{i}" for i in range(len(comp_names), len(fractions))]
 
     z_inlet = {}
     for name, frac in zip(comp_names, fractions):
@@ -316,6 +356,20 @@ def Calculate(unit):
     y_h2 = z_inlet.get("h2", 0.0)
     x_diox = z_inlet.get("diox", 0.0)
     x_h2o = z_inlet.get("h2o", 0.0)
+
+    # Graceful handling for zero or uninitialized feed during solver initialization
+    if total_flow <= 1e-6 or (x_co2 + y_h2 + x_diox) < 1e-5:
+        if "Vapor_Out" in unit.ports:
+            try:
+                unit.ports["Vapor_Out"].set(p=P_bar * 1e5, flow_rate=total_flow * 0.5, x=fractions)
+            except Exception:
+                pass
+        if "Slurry_Out" in unit.ports:
+            try:
+                unit.ports["Slurry_Out"].set(p=P_bar * 1e5, flow_rate=total_flow * 0.5, x=fractions)
+            except Exception:
+                pass
+        return
 
     # 3. Solve Hydrate Flash
     res = run_hydrate_flash(
@@ -360,51 +414,98 @@ def Calculate(unit):
         return slurry_x
 
     # Assign to ports
+    h_feed = 0.0
+    try:
+        if hasattr(feed, 'get_property'):
+            h_feed = feed.get_property('enthalpy')
+    except Exception:
+        pass
+
     if "Vapor_Out" in unit.ports:
         gas_phase = "vapor" if "vapor" in res["compositions"] else "lhc"
+        v_flow = total_flow * alpha_vap
+        v_x = make_full_x(gas_phase)
         try:
             unit.ports["Vapor_Out"].set(
                 t=T_feed,
                 p=P_bar * 1e5,
-                flow_rate=total_flow * alpha_vap,
-                x=make_full_x(gas_phase)
+                flow_rate=v_flow,
+                x=v_x
             )
-        except Exception:
-            pass
+        except Exception as e1:
+            try:
+                unit.ports["Vapor_Out"].set(
+                    enthalpy=h_feed,
+                    p=P_bar * 1e5,
+                    flow_rate=v_flow,
+                    x=v_x
+                )
+            except Exception as e2:
+                print(f"Error setting Vapor_Out: {e1} / {e2}")
 
     if "Slurry_Out" in unit.ports:
+        s_flow = total_flow * alpha_slurry
+        s_x = make_slurry_x()
         try:
             unit.ports["Slurry_Out"].set(
                 t=T_feed,
                 p=P_bar * 1e5,
-                flow_rate=total_flow * alpha_slurry,
-                x=make_slurry_x()
+                flow_rate=s_flow,
+                x=s_x
             )
-        except Exception:
-            pass
+        except Exception as e1:
+            try:
+                unit.ports["Slurry_Out"].set(
+                    enthalpy=h_feed,
+                    p=P_bar * 1e5,
+                    flow_rate=s_flow,
+                    x=s_x
+                )
+            except Exception as e2:
+                print(f"Error setting Slurry_Out: {e1} / {e2}")
 
     if "Hydrate_Out" in unit.ports:
         hyd_phase = res.get("hydrate_type", "s2")
+        h_flow = total_flow * alpha_hyd
+        h_x = make_full_x(hyd_phase)
         try:
             unit.ports["Hydrate_Out"].set(
                 t=T_feed,
                 p=P_bar * 1e5,
-                flow_rate=total_flow * alpha_hyd,
-                x=make_full_x(hyd_phase)
+                flow_rate=h_flow,
+                x=h_x
             )
-        except Exception:
-            pass
+        except Exception as e1:
+            try:
+                unit.ports["Hydrate_Out"].set(
+                    enthalpy=h_feed,
+                    p=P_bar * 1e5,
+                    flow_rate=h_flow,
+                    x=h_x
+                )
+            except Exception as e2:
+                print(f"Error setting Hydrate_Out: {e1} / {e2}")
 
     if "Liquid_Out" in unit.ports:
+        l_flow = total_flow * alpha_liq
+        l_x = make_full_x("aqueous")
         try:
             unit.ports["Liquid_Out"].set(
                 t=T_feed,
                 p=P_bar * 1e5,
-                flow_rate=total_flow * alpha_liq,
-                x=make_full_x("aqueous")
+                flow_rate=l_flow,
+                x=l_x
             )
-        except Exception:
-            pass
+        except Exception as e1:
+            try:
+                unit.ports["Liquid_Out"].set(
+                    enthalpy=h_feed,
+                    p=P_bar * 1e5,
+                    flow_rate=l_flow,
+                    x=l_x
+                )
+            except Exception as e2:
+                print(f"Error setting Liquid_Out: {e1} / {e2}")
 
 
 # -----------------------------------------------------------------------------
