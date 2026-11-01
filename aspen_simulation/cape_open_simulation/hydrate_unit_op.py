@@ -66,6 +66,22 @@ def normalize_component_name(name: str) -> str:
 
 
 # -----------------------------------------------------------------------------
+# Global In-Memory Flash Cache for Rapid Flowsheet Recycle Iterations
+# -----------------------------------------------------------------------------
+_FLASH_CACHE = {}
+
+def get_cache_key(T_K, P_bar, x_CO2, y_H2, x_DIOX, x_H2O):
+    return (
+        round(float(T_K), 1),
+        round(float(P_bar), 1),
+        round(float(x_CO2), 3),
+        round(float(y_H2), 3),
+        round(float(x_DIOX), 3),
+        round(float(x_H2O), 3) if x_H2O is not None else -1.0
+    )
+
+
+# -----------------------------------------------------------------------------
 # Core Dynamic Hydrate Flash Engine
 # -----------------------------------------------------------------------------
 def run_hydrate_flash(
@@ -126,6 +142,11 @@ def run_hydrate_flash(
         P_bar = float(P) / 1.0e5
     else:
         P_bar = float(P)
+
+    # Fast In-Memory Flash Cache for rapid flowsheet recycle convergence
+    c_key = get_cache_key(T_K, P_bar, x_CO2, y_H2, x_DIOX, x_H2O)
+    if c_key in _FLASH_CACHE:
+        return _FLASH_CACHE[c_key]
 
     # 2. Dynamic Component Selection
     active_comps = ["water", "co2"]
@@ -217,6 +238,7 @@ def run_hydrate_flash(
     if verbose:
         print_results_table(results)
 
+    _FLASH_CACHE[c_key] = results
     return results
 
 
